@@ -1,27 +1,28 @@
 version: '3.8'
 
 services:
-  database:
+  baguetteboost-db:
     image: mysql:8.0
-    container_name: baguetteboost-mysql
+    container_name: baguetteboost-db
     restart: always
     env_file:
       - .env
     ports:
       - "3306:3306"
     volumes:
-      - mysql_data:/var/lib/mysql
+      - mysql_data:/var/lib/mysql # 데이터 영속성 보장 (컨테이너 재시작 시 데이터 휘발 방지)
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
-      - app-network
+      - baguetteboost-network
     healthcheck:
       # .env에 정의된 변수를 헬스체크 명령어에 보간(interpolation)하여 사용
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "${MYSQL_USER}", "-p${MYSQL_PASSWORD}"]
       interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 30s
 
-  backend:
+  baguetteboost-backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -31,15 +32,33 @@ services:
       - .env
     ports:
       - "8000:8000"
-    depends_on:
-      database:
-        condition: service_healthy
     networks:
-      - app-network
+      - baguetteboost-network
+    # mysql 컨테이너가 실행 후 'healthy' 상태일 때 백엔드 구동
+    depends_on:
+      baguetteboost-db:
+        condition: service_healthy
+
+  baguetteboost-ai:
+    # 예시: AI 서비스 전용 도커파일이 있는 경로 지정 또는 이미지 사용
+    # build:
+    #   context: ./ai
+    #   dockerfile: Dockerfile
+    image: python:3.11-slim # AI 컨테이너 이미지 (실제 이미지로 대체 필요)
+    container_name: baguetteboost-ai
+    restart: unless-stopped
+    env_file:
+      - .env
+    command: tail -f /dev/null # 플레이스홀더용 무한 대기 명령 (실제 AI 실행 명령으로 대체 필요)
+    networks:
+      - baguetteboost-network
+    depends_on:
+      - baguetteboost-backend
 
 networks:
-  app-network:
-    driver: bridge
+  name: baguetteboost-network
+  driver: bridge
 
 volumes:
-  mysql_data:
+  db_data:
+    name: baguetteboost-db-data

@@ -127,9 +127,9 @@
 ```json
 [
   {
-    "id": "1", "name": "김순자", "age": 78, "avatarInitial": "김", "status": "alert", "isFallConfirmed": true,
-    "location": { "address": "역삼로 24", "zoneLabel": "안전구역 이탈", "inSafeZone": false, "lat": 37.501, "lng": 127.036 },
-    "battery": 78, "lastUpdated": "2026-06-19T09:41:00+09:00"
+    "id": "1", "name": "김순자", "age": 78, "avatarInitial": "김", "status": "alert", 
+    "location": { "address": "역삼로 24", "zoneLabel": "안전구역 이탈", "inSafeZone": false, "isFallConfirmed": true, "lat": 37.501, "lng": 127.036, "updatedAt": "2026-06-19T09:41:00+09:00" },
+    "battery": 78, 
   }, {}, ...
 ]
 ```
@@ -161,8 +161,8 @@
 {
   "personId": "1",
   "name": "김순자",
-  "deviceId": "TRK-9F2C-1180",
-  "deviceToken": "st_live_secret_abc123..." // 디바이스가 통신 시 사용할 인증키
+  "deviceToken": "st_live_secret_abc123...", // 디바이스가 통신 시 사용할 인증키
+  "createdAt": "2026-06-19T09:41:00+09:00"
 }
 ```
 
@@ -181,7 +181,7 @@
 ```json
 {
   "address": "역삼로 24", "zoneLabel": "안전구역 이탈", "inSafeZone": false,
-  "lat": 37.501, "lng": 127.036, "isFallConfirmed": true, "updatedAt": "2026-06-19T09:41:00+09:00"
+  "latitude": 37.501, "longitude": 127.036, "isFallConfirmed": true, "updatedAt": "2026-06-19T09:41:00+09:00"
 }
 ```
 
@@ -194,7 +194,7 @@
 ### `GET /persons/:id/history?from=2026-06-19T09:25:00&to=2026-06-19T09:35:00`
 위치 이동 경로(지도 라인).
 ```json
-[ { "lat": 37.500, "lng": 127.034, "at": "2026-06-19T09:30:00+09:00" }, ... ]
+[ { "latitude": 37.500, "longitude": 127.034, "updatedAt": "2026-06-19T09:30:00+09:00" }, ... ]
 ```
 
 ---
@@ -252,7 +252,7 @@
 ```json
 {
   "items": [
-    { "id": "a1", "personId": "1", "type": "zone_exit", "message": "안전구역을 이탈했습니다",
+    { "id": "a1", "personId": "1", "alertType": "zone_exit", "message": "안전구역을 이탈했습니다",
       "createdAt": "2026-06-19T09:41:00+09:00", "read": false }
   ],
   "nextCursor": null

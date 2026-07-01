@@ -1,0 +1,14 @@
+from pydantic import BaseModel
+from datetime import datetime
+
+class AlertResponse(BaseModel):
+    id: int
+    person_id: int
+    alert_type: str = Field(..., alias="alertType", description="zone_exit | low_battery | fall_detected | offline")
+    message: str
+    created_at: datetime = Field(..., alias="createdAt")
+    
+    model_config = ConfigDict(
+        populate_by_name = True
+        from_attributes = True
+    )

@@ -4,6 +4,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     JWT_SECRET: str
     AI_SERVICE_URL: str
+    AI_REQUEST_TIMEOUT: int = 5 # 타임아웃 5초 설정
 
     class Config:
         env_file = ".env"

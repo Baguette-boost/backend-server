@@ -12,6 +12,8 @@ class GPSRequest(BaseModel):
     personId: int
     gps: GPSPoint
 
+# TODO: GPSCommon과 GPSRequest의 형태로 수정
+
 # --- 2. 낙상 의심 (IMU) 관련 스키마 ---
 class IMUData(BaseModel):
     ax: List[float] = Field(default_factory=list)

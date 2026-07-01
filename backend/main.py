@@ -6,6 +6,7 @@ import time
 from contextlib import asynccontextmanager
 from core.scheduler import start_scheduler, stop_scheduler
 from services.ai_client import ai_client
+from core.security import get_current_user, verify_device_token
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

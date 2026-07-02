@@ -12,6 +12,7 @@ services:
       - "3306:3306"
     volumes:
       - db_data:/var/lib/mysql # 데이터 영속성 보장 (컨테이너 재시작 시 데이터 휘발 방지)
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - baguetteboost-network
     healthcheck:

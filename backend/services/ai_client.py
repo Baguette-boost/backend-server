@@ -1,6 +1,6 @@
 import httpx
 import logging
-from core.config import settings
+from config import settings
 from schemas.ai import AIPredictRequest, AIPredictResponse
 
 logger = logging.getLogger(__name__)

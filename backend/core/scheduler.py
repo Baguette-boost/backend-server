@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from core.buffer import gps_buffer # dict of deques
+from core.buffer import patient_gps_buffer as gps_buffer # dict of deques
 from services.ai_client import ai_client
 from schemas.ai import AIPredictRequest, GPSPoint
 from services.alert_service import save_wandering_alert

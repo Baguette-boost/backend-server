@@ -1,22 +1,22 @@
-version: '3.8'
-
 services:
   baguetteboost-db:
     image: mysql:8.0
     container_name: baguetteboost-db
     restart: always
+    # env_file을 지정하면 .env 파일의 변수들이 컨테이너 내부로 주입됩니다.
     env_file:
       - .env
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
     ports:
       - "3306:3306"
     volumes:
-      - mysql_data:/var/lib/mysql # 데이터 영속성 보장 (컨테이너 재시작 시 데이터 휘발 방지)
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - db_data:/var/lib/mysql # 데이터 영속성 보장 (컨테이너 재시작 시 데이터 휘발 방지)
     networks:
       - baguetteboost-network
     healthcheck:
-      # .env에 정의된 변수를 헬스체크 명령어에 보간(interpolation)하여 사용
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "${MYSQL_USER}", "-p${MYSQL_PASSWORD}"]
+      # CMD-SHELL 방식을 사용해야 .env 변수가 정상적으로 치환됨
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u $MYSQL_USER -p$MYSQL_PASSWORD"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -55,10 +55,12 @@ services:
     depends_on:
       - baguetteboost-backend
 
-networks:
-  name: baguetteboost-network
-  driver: bridge
-
 volumes:
   db_data:
     name: baguetteboost-db-data
+
+networks:
+  baguetteboost-network:
+    name: baguetteboost-network
+    driver: bridge
+

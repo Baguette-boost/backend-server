@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from typing import List
-from app.schemas.alert import AlertResponse
-from app.core.security import get_current_user
+from schemas.alert import AlertResponse
+from core.security import get_current_user
 
 router = APIRouter(prefix="/alerts", tags=["Alerts"])
 

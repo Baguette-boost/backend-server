@@ -17,7 +17,6 @@ class AlertLog(Base):
     )
     alert_type: Mapped[str] = mapped_column(String(50)) # 예: 'FALL_DETECTED', 'GEOFENCE_EXIT'
     message: Mapped[str] = mapped_column(Text)
-    is_resolved: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), index=True
     )

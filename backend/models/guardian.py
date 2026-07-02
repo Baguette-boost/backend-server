@@ -1,6 +1,8 @@
-from sqlalchemy import String, DateTime
+from sqlalchemy import String, DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import List
+
+from datetime import datetime
 
 from .base import Base, TimestampMixin
 
@@ -8,9 +10,8 @@ class Guardian(Base, TimestampMixin):
     __tablename__ = "guardians"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     password: Mapped[str] = mapped_column(String(255))
-    phone_number: Mapped[str] = mapped_column(String(20))
+    phone: Mapped[str] = mapped_column(String(20))
     name: Mapped[str] = mapped_column(String(50))
     expo_token: Mapped[str] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(

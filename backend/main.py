@@ -23,6 +23,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan, title="Baguetteboost Backend", version="1.0.0")
 
+# 웹소켓 라우터 등록
+app.include_router(realtime.router)
+
 # GPS 인메모리 버퍼 공간 선언
 # 구조: {person_id: deque(maxlen=180)} -> 10초 주기 기준 30분 분량 = 180개
 # 데이터 포맷 예시: {"lat": 37.123, "lng": 127.123, "timestamp": 1700000000}

@@ -200,7 +200,7 @@
 ---
 
 ## 4-1. 실시간 (WebSocket)
-폴링 대신 실시간 갱신. 연결: `wss://api.safetrack.example/v1/realtime`
+폴링 대신 실시간 갱신. 연결: `wss://api.safetrack.example/realtime`
 (커스텀헤더에 accessToken 실어보냄)
 
 서버 → 클라이언트 이벤트(JSON):

@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from core.scheduler import start_scheduler, stop_scheduler
 from services.ai_client import ai_client
 from core.security import get_current_user, verify_device_token
-
+from routers.realtime import router 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 1. AI HTTP 클라이언트 시작
@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan, title="Baguetteboost Backend", version="1.0.0")
 
 # 웹소켓 라우터 등록
-app.include_router(realtime.router)
+app.include_router(router)
 
 # GPS 인메모리 버퍼 공간 선언
 # 구조: {person_id: deque(maxlen=180)} -> 10초 주기 기준 30분 분량 = 180개

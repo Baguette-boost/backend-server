@@ -4,11 +4,9 @@ import logging
 from datetime import datetime
 from exponent_server_sdk import (
     PushClient,
-    PushMessage,
-    ExpoPushToken,
-    ExpoPushError
+    PushMessage
 )
-from core.websocket import manager
+from backend.core.websocket import manager
 
 logger = logging.getLogger(__name__)
 

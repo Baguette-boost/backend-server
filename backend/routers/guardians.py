@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from core.security import get_current_user
+from backend.core.security import get_current_user
 
 router = APIRouter(tags=["Guardians"])
 

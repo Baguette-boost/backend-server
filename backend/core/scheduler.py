@@ -1,10 +1,10 @@
 import logging
 from datetime import datetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from core.buffer import patient_gps_buffer as gps_buffer # dict of deques
-from services.ai_client import ai_client
-from schemas.ai import AIPredictRequest, GPSPoint
-from services.alert_service import save_wandering_alert
+from backend.core.buffer import patient_gps_buffer as gps_buffer # dict of deques
+from backend.services.ai_client import ai_client
+from backend.schemas.ai import AIPredictRequest, GPSPoint
+from backend.services.alert_service import save_wandering_alert
 
 logger = logging.getLogger(__name__)
 scheduler = AsyncIOScheduler()

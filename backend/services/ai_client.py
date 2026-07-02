@@ -1,7 +1,7 @@
 import httpx
 import logging
-from config import settings
-from schemas.ai import AIPredictRequest, AIPredictResponse
+from backend.config import settings
+from backend.schemas.ai import AIPredictRequest, AIPredictResponse
 
 logger = logging.getLogger(__name__)
 

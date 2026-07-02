@@ -24,8 +24,10 @@ services:
 
   baguetteboost-backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      - PYTHONPATH=/app
     container_name: baguetteboost-backend
     restart: always
     env_file:

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
-from core.websocket import manager
-from core.security import get_current_user # 자체 구현된 JWT 검증 로직 임포트
+from backend.core.websocket import manager
+from backend.core.security import get_current_user # 자체 구현된 JWT 검증 로직 임포트
 
 router = APIRouter()
 

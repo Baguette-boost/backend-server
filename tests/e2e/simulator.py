@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
 from backend.core.websocket import manager 
-from backend.services.notificication_service import _send_expo_push
+from backend.services.notification_service import NotificationService 
 from backend.models.alert import AlertLog
 from datetime import datetime
 import uuid

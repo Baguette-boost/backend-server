@@ -4,8 +4,8 @@ from datetime import datetime
 import uuid
 
 # 내부 모듈 임포트 (경로는 프로젝트 환경에 맞게 수정)
-from app.schemas.person import PersonCreate, PersonResponse, LocationAbstractResponse, LocationResponse, LocationHistoryResponse
-from app.core.security import get_current_user
+from backend.schemas.person import PersonCreate, PersonResponse, LocationAbstractResponse, LocationResponse, LocationHistoryResponse
+from backend.core.security import get_current_user
 
 router = APIRouter(prefix="/persons", tags=["Persons"])
 

@@ -3,7 +3,7 @@ import random
 from datetime import datetime, timedelta
 
 from backend.database import AsyncSessionLocal
-from backend.models.location import LocationHistory
+from backend.models.telemetry import GpsLog 
 import uuid
 
 # 기준 좌표 (예: CBNU 위경도)
@@ -26,12 +26,12 @@ async def generate_trajectory(person_id: str, steps: int = 50, interval_minutes:
             current_lng += random.uniform(-0.0005, 0.0005)
             current_time += timedelta(minutes=interval_minutes)
 
-            dummy_location = LocationHistory(
-                id=str(uuid.uuid4()),
+            dummy_location = GpsLog(
+                id=uuid.uuid4(),
                 person_id=person_id,
                 latitude=current_lat,
                 longitude=current_lng,
-                recorded_at=current_time
+                timestamp=current_time
             )
             session.add(dummy_location)
 

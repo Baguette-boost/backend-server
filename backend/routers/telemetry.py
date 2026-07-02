@@ -2,12 +2,12 @@ from fastapi import APIRouter, BackgroundTasks, Depends, status
 from aiomysql import Pool # 기존에 세팅한 커넥션 풀
 import logging
 
-from schemas.telemetry import GPSRequest, FallSuspectRequest
-from core.buffer import add_gps_to_buffer, get_patient_gps_history
+from backend.schemas.telemetry import GPSRequest, FallSuspectRequest
+from backend.core.buffer import add_gps_to_buffer, get_patient_gps_history
 from backend.database import get_db  # DB 의존성 주입
 from backend.main import verify_device_token # 디바이스 인증 의존성 주입
 
-from services.ai_client import ai_client.predict
+from backend.services.ai_client import ai_client.predict
 
 import os
 from dotenv import load_dotenv

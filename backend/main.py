@@ -4,11 +4,11 @@ from typing import Dict
 import time
 
 from contextlib import asynccontextmanager
-from core.scheduler import start_scheduler, stop_scheduler
-from services.ai_client import ai_client
-from core.security import get_current_user, verify_device_token
-from routers.realtime import router 
-from routers.simulator import sim_router
+from backend.core.scheduler import start_scheduler, stop_scheduler
+from backend.services.ai_client import ai_client
+from backend.core.security import get_current_user, verify_device_token
+from backend.routers.realtime import router 
+from tests.e2e.simulator import sim_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import declarative_base
-from config import settings
+from backend.config import settings
 
 # 비동기 MySQL 엔진 연결
 engine = create_async_engine(

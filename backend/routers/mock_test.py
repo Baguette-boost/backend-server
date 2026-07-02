@@ -1,6 +1,6 @@
 from fastapi import APIRouter, BackgroundTasks
 from pydantic import BaseModel
-from services.notification_service import NotificationService
+from backend.services.notification_service import NotificationService
 
 router = APIRouter()
 

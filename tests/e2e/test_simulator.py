@@ -4,14 +4,14 @@ import uuid
 
 # backend 디렉터리의 모듈들을 절대 경로로 임포트
 from backend.database import get_db
-from backend.services.notificication_service import NotificationService
+from backend.services.notification_service import NotificationService
 
 from backend.models.alert import AlertLog 
 
 sim_router = APIRouter(prefix="/test/trigger", tags=["Simulator (E2E Test)"])
 
 @sim_router.post("/fall")
-async def trigger_fall_event(
+async def test_trigger_fall(
     person_id: str, 
     background_tasks: BackgroundTasks, 
     guardian_id: int = 1,
@@ -51,7 +51,7 @@ async def trigger_fall_event(
 
 
 @sim_router.post("/wandering")
-async def trigger_wandering_event(
+async def test_trigger_wandering(
     person_id: str, 
     background_tasks: BackgroundTasks, 
     guardian_id: int = 1,

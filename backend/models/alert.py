@@ -1,0 +1,25 @@
+from sqlalchemy import String, ForeignKey, Boolean, Text, DateTime, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from datetime import datetime
+from typing import TYPE_CHECKING
+
+from .base import Base
+
+if TYPE_CHECKING:
+    from .person import TrackedPerson
+
+class AlertLog(Base):
+    __tablename__ = "alert_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    person_id: Mapped[int] = mapped_column(
+        ForeignKey("tracked_persons.id", ondelete="CASCADE"), index=True
+    )
+    alert_type: Mapped[str] = mapped_column(String(50)) # 예: 'FALL_DETECTED', 'GEOFENCE_EXIT'
+    message: Mapped[str] = mapped_column(Text)
+    is_resolved: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), index=True
+    )
+
+    person: Mapped["TrackedPerson"] = relationship(back_populates="alerts")

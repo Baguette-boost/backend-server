@@ -22,17 +22,15 @@ async def trigger_fall(
     """
     try:
         alert_id = str(uuid.uuid4())
-        # # DB에 경고 로그 저장 (비동기)
-        # new_alert = AlertLog(
-        #     id=alert_id,
-        #     person_id=person_id,
-        #     alert_type="FALL",
-        #     timestamp=datetime.utcnow(),
-        #     message="[SIMULATION] 낙상이 감지되었습니다."
-        # )
-        # db.add(new_alert)
-        # await db.commit()
-        # await db.refresh(new_alert)
+        # DB에 경고 로그 저장 (비동기)
+        new_alert = AlertLog(
+            id=alert_id,
+            person_id=person_id,
+            alert_type="FALL",
+            timestamp=datetime.utcnow(),
+            message="[SIMULATION] 낙상이 감지되었습니다."
+        )
+        db.add(new_alert)
 
         # Expo 푸시 알림 발송 (백그라운드 처리로 논블로킹 유지)
         push_title = "🚨 긴급: 낙상 감지"
@@ -42,7 +40,7 @@ async def trigger_fall(
         return {"status": "success", "message": "Fall event triggered pipeline successfully.", "alert_id": alert_id}
 
     except Exception as e:
-        # await db.rollback()
+        await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -59,20 +57,19 @@ async def trigger_wandering_event(
     """
     try:
         alert_id = str(uuid.uuid4())
-        # new_alert = AlertLog(
-        #     id=alert_id,
-        #     person_id=person_id,
-        #     alert_type="WANDERING",
-        #     timestamp=datetime.utcnow(),
-        #     message="[SIMULATION] 안전 구역 이탈(배회)이 감지되었습니다."
-        # )
-        # db.add(new_alert)
-        # await db.commit()
+        new_alert = AlertLog(
+            id=alert_id,
+            person_id=person_id,
+            alert_type="WANDERING",
+            timestamp=datetime.utcnow(),
+            message="[SIMULATION] 안전 구역 이탈(배회)이 감지되었습니다."
+        )
+        db.add(new_alert)
         
         background_tasks.add_task(NotificationService.broadcast_event, guardian_id=guardian_id, event_type="alert", person_id=person_id, payload_data={ "type": "status", "personId": "1", "status": "alert" })
 
         return {"status": "success", "message": "Wandering event triggered pipeline successfully."}
 
     except Exception as e:
-        # await db.rollback()
+        await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))

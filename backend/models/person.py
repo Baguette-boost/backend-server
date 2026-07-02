@@ -21,7 +21,7 @@ class TrackedPerson(Base, TimestampMixin):
     )
     name: Mapped[str] = mapped_column(String(50))
     age: Mapped[int] = mapped_column(Integer)
-    device_id: Mapped[str] = mapped_column(String(100))
+    device_id: Mapped[str] = mapped_column(String(100), autoincrement=True)
     device_token: Mapped[str] = mapped_column(Text)
     current_battery: Mapped[int] = mapped_column(Integer)
     is_active: Mapped[bool] = mapped_column(Boolean)

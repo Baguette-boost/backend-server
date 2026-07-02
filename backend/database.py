@@ -1,3 +1,4 @@
+from contextlib import asyncontextmanager
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import declarative_base
 from backend.config import settings
@@ -24,5 +25,20 @@ async def get_db():
     async with AsyncSessionLocal() as session:
         try:
             yield session
+        except Exception:
+            await session.rollback() # 에러 발생 시 안전하게 롤백
         finally:
             await session.close()
+
+@asynccontextmanager
+async def get_independent_session():
+    """ HTTP 컨텍스트 외부(스케줄러, BackgroundTasks)에서 수동으로 세션을 제어할 때 사용 """
+    session = AsyncSessionLocal()
+    try:
+        yield session
+        await session.commit() # 정상 종료 시 자동 커밋
+    except Exception as e:
+        await session.rollback() # 에러 발생 시 자동 롤백
+        raise e
+    finally:
+        await session.close() # 연결 해제

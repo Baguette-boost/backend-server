@@ -1,13 +1,18 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Depends, status, HTTPException
 from aiomysql import Pool # 기존에 세팅한 커넥션 풀
 import logging
 
 from backend.schemas.telemetry import GPSRequest, FallSuspectRequest
 from backend.core.buffer import add_gps_to_buffer, get_patient_gps_history
-from backend.database import get_db  # DB 의존성 주입
 from backend.main import verify_device_token # 디바이스 인증 의존성 주입
 
-from backend.services.ai_client import ai_client.predict
+from backend.services.ai_client import predict
+
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
+from backend.database import get_db, get_independent_session  # DB 의존성 주입
+from backend.models.telemetry import GpsLog
 
 import os
 from dotenv import load_dotenv
@@ -24,18 +29,22 @@ router = APIRouter(
 
 # Background Task 용 비동기 함수
 
-async def async_insert_gps_log(person_id: int, gps_data: dict, pool: Pool = None):
+async def async_insert_gps_log(person_id: int, gps_data: dict):
     """(Background) DB의 gps_logs 테이블에 비동기 INSERT 수행"""
-    # 실제: session.execute로 쿼리 실행, session.commit으로 반영
-    query = """
-        INSERT INTO gps_logs (person_id, timestamp, latitude, longitude)
-        VALUES (%s, %s, %s, %s)
-    """
-    # 임시 Mocking 로직
-    logger.info(f"[DB INSERT] personId: {person_id}, gps: {gps_data}")
-    # await session.execute(text(query), {"person_id": person_id, "gps": gps_data})
-    # await session.commit()
+    async with get_independent_session() as db:
+        new_gps = GpsLog(
+            "person_id"=person_id,
+            "latitude"=gps_data["latitude"],
+            "longitude"=gps_data["longitude"],
+            "battery"=gps_data["battery"],
+            "is_fall_detected"=gps_data.get("is_fall_detected", False),
+            "is_wandering_detected"=gps_data.get("is_wandering_detected", False),
+            "created_at"=gps_data.get("timestamp")
+        )
 
+        logger.info(f"[DB INSERT] personId: {person_id}, gps: {gps_data}")
+
+        db.add(new_gps)
 
 # API Endpoints
 
@@ -43,7 +52,7 @@ async def async_insert_gps_log(person_id: int, gps_data: dict, pool: Pool = None
 async def receive_gps(
     request: GPSRequest, 
     background_tasks: BackgroundTasks,
-    pool: Pool = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     [디바이스 -> 서버] 10초 주기로 전송되는 GPS 데이터 수신
@@ -56,7 +65,7 @@ async def receive_gps(
     add_gps_to_buffer(request.personId, gps_dict)
     
     # 2. DB Insert는 백그라운드로 넘겨 API 응답 속도 최적화
-    background_tasks.add_task(async_insert_gps_log, request.personId, gps_dict, pool)
+    background_tasks.add_task(async_insert_gps_log, request.personId, gps_dict)
     
     return {"status": "success", "message": "GPS buffered"}
 
@@ -76,10 +85,10 @@ async def receive_fall_suspect(
 
     # AI 서버 규약에 맞게 페이로드 구성
     payload = AIPredictRequest(
-        "personId": request.personId,
-        "timestamp": timestamp_str,
-        "imuData": imu_dict,
-        "gpsData": gps_list
+        "personId"=request.personId,
+        "timestamp"=timestamp_str,
+        "imuData"=imu_dict,
+        "gpsData"=gps_list
     )
     
     # 1. 디바이스에는 즉각적으로 202 Accepted 응답을 반환하기 위해 AI 통신을 백그라운드로 위임

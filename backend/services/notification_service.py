@@ -2,17 +2,21 @@ import os
 import asyncio
 import logging
 from datetime import datetime
-from exponent_server_sdk import (
-    PushClient,
-    PushMessage
-)
+from exponent_server_sdk import PushClient, PushMessage, ExpoPushError
+
 from backend.core.websocket import manager
+
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
+from backend.database import get_db
+from backend.models.guardian import Guardian
 
 logger = logging.getLogger(__name__)
 
 class NotificationService:
     @staticmethod
-    async def broadcast_event(guardian_id: int, event_type: str, person_id: str, payload_data: dict):
+    async def broadcast_event(db: AsyncSession, guardian_id: int, event_type: str, person_id: str, payload_data: dict):
         """
         웹소켓 이벤트 브로드캐스팅용 함수
         WebSocket(대시보드용)과 Expo Push(모바일용)를 비동기적으로 동시 실행.
@@ -59,7 +63,7 @@ class NotificationService:
         ws_task = manager.send_personal_message(message_payload, guardian_id)
 
         # 2. Expo Push 전송 태스크
-        expo_task = NotificationService._send_expo_push(guardian_id, payload_data)
+        expo_task = NotificationService._send_expo_push(db, guardian_id, payload_data)
 
         # 두 작업을 병렬로 동시 실행 (I/O 병목 방지)
         results = await asyncio.gather(ws_task, expo_task, return_exceptions=True)
@@ -69,12 +73,23 @@ class NotificationService:
                 logger.error(f"Alert task failed: {result}")
 
     @staticmethod
-    async def _send_expo_push(guardian_id: int, extra_data: dict = None):
+    async def _send_expo_push(db: AsyncSession, guardian_id: int, extra_data: dict = None):
         """Expo Push 발송 로직 (비동기 스레드 풀에서 실행)"""
-        # 실제 환경: DB에서 guardian_id에 매핑된 Expo 푸시 토큰 조회
-        # expo_token = await db.get_expo_token(guardian_id)
-        expo_token = "ExponentPushToken[mock_token_string]" # os.getenv("MOCK_EXPO_TOKEN", "ExponentPushToken[default_mock]")
+        # DB에서 guardian_id에 매핑된 Expo 푸시 토큰 조회
+        stmt = select(Guardian.expo_token).where(
+            Guardian.id == guardian_id
+        )
+
+        expo_token = (await db.execute(stmt)).scalars().first()
+
+        if not expo_token:
+            logger.info(f"Guardian {guardian_id} has no expo token. Skipping push notification")
+            return
+
         alert_type = extra_data.get("type") if extra_data else None
+
+        title = "알림"
+        body = "새로운 상태 업데이트가 있습니다."
 
         if alert_type == 'zone_exit':
             title = "🚨 안전 구역 이탈"

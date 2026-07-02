@@ -59,7 +59,7 @@ class NotificationService:
         ws_task = manager.send_personal_message(message_payload, guardian_id)
 
         # 2. Expo Push 전송 태스크
-        expo_task = NotificationService._send_expo_push(guardian_id, extra_data)
+        expo_task = NotificationService._send_expo_push(guardian_id, payload_data)
 
         # 두 작업을 병렬로 동시 실행 (I/O 병목 방지)
         results = await asyncio.gather(ws_task, expo_task, return_exceptions=True)
@@ -74,7 +74,8 @@ class NotificationService:
         # 실제 환경: DB에서 guardian_id에 매핑된 Expo 푸시 토큰 조회
         # expo_token = await db.get_expo_token(guardian_id)
         expo_token = "ExponentPushToken[mock_token_string]" # os.getenv("MOCK_EXPO_TOKEN", "ExponentPushToken[default_mock]")
-        
+        alert_type = extra_data.get("type") if extra_data else None
+
         if alert_type == 'zone_exit':
             title = "🚨 안전 구역 이탈"
             body = "안전 구역 이탈이 감지되었습니다"

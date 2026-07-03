@@ -43,20 +43,18 @@ services:
         condition: service_healthy
 
   baguetteboost-ai:
-    # 예시: AI 서비스 전용 도커파일이 있는 경로 지정 또는 이미지 사용
-    # build:
-    #   context: ./ai
-    #   dockerfile: Dockerfile
-    image: python:3.11-slim # AI 컨테이너 이미지 (실제 이미지로 대체 필요)
+    build:
+      context: ./ai-model-release
+      dockerfile: Dockerfile
     container_name: baguetteboost-ai
     restart: unless-stopped
     env_file:
       - .env
-    command: tail -f /dev/null # 플레이스홀더용 무한 대기 명령 (실제 AI 실행 명령으로 대체 필요)
     networks:
       - baguetteboost-network
     depends_on:
-      - baguetteboost-backend
+      baguetteboost-backend:
+        condition: service_started
 
 volumes:
   db_data:

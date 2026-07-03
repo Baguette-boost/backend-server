@@ -18,6 +18,8 @@ from backend.routers.guardians import guardian_router
 from backend.routers.persons import person_router
 from backend.routers.telemetry import telemetry_router
 
+from backend.routers.sensor_router import ai_router
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 1. AI HTTP 클라이언트 시작
@@ -56,6 +58,8 @@ app.include_router(person_router)
 # telemetry 라우터 등록
 app.include_router(telemetry_router)
 
+# ai 라우터 등록
+app.include_router(ai_router)
 
 # GPS 인메모리 버퍼 공간 선언
 # 구조: {person_id: deque(maxlen=180)} -> 10초 주기 기준 30분 분량 = 180개

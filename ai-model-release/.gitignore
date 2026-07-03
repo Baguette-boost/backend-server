@@ -8,6 +8,7 @@
 !metrics.json
 !requirements.txt
 !.gitignore
+!ICCAS_total_data_with_fall.xlsx
 
 !docs/
 !docs/FINAL_DATA_TRAINING_REPORT.md

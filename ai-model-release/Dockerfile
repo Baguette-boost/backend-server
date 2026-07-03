@@ -24,11 +24,14 @@ RUN pip install --upgrade pip && \
 # 무거운 원본 데이터(xlsx)나 불필요한 캐시 파일은 제외하고 실행에 필요한 디렉토리만 복사
 COPY scripts/ ./scripts/
 COPY models/ ./models/
+COPY ICCAS_total_data_with_fall.xlsx .
 
 # 7. 기본 실행 명령어 설정 (Live 모드)
 # 컨테이너 실행 시 실시간 추론 스크립트를 구동하고, 분석 결과를 백엔드 컨테이너로 전송하도록 세팅
 # 호스트명은 docker-compose.yml의 백엔드 컨테이너 이름(baguetteboost-backend)을 사용
-CMD ["python", "scripts/realtime_sensor_lstm.py", "live", \
+CMD ["python", "scripts/realtime_sensor_lstm.py", "replay", \
+     "--source", "ICCAS_total_data_with_fall.xlsx", \
+     "--sheet", "data", \
      "--model", "models/iccas_sensor_lstm_fall.pt", \
      "--backend-url", "http://baguetteboost-backend:8000/api/sensor-result", \
      "--device", "cpu"]

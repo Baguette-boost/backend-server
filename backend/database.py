@@ -1,4 +1,4 @@
-from contextlib import asyncontextmanager
+from contextlib import asynccontextmanager
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import declarative_base
 from backend.config import settings
@@ -27,6 +27,7 @@ async def get_db():
             yield session
         except Exception:
             await session.rollback() # 에러 발생 시 안전하게 롤백
+            raise
         finally:
             await session.close()
 

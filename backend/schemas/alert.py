@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 
 class AlertResponse(BaseModel):
@@ -9,6 +9,6 @@ class AlertResponse(BaseModel):
     created_at: datetime = Field(..., alias="createdAt")
     
     model_config = ConfigDict(
-        populate_by_name = True
+        populate_by_name = True,
         from_attributes = True
     )

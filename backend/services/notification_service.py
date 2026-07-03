@@ -2,7 +2,7 @@ import os
 import asyncio
 import logging
 from datetime import datetime
-from exponent_server_sdk import PushClient, PushMessage, ExpoPushError
+from exponent_server_sdk import PushClient, PushMessage, PushServerError
 
 from backend.core.websocket import manager
 
@@ -121,7 +121,7 @@ class NotificationService:
             # response.is_error 등 Expo 고유의 에러 응답 포맷 검증 가능
             logger.info(f"Successfully sent Expo push message. ID: {response.id}")
             
-        except ExpoPushError as e:
+        except PushServerError as e:
             logger.error(f"Expo push validation/sending failed for guardian {guardian_id}: {e}")
             raise e
         except Exception as e:

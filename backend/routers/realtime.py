@@ -1,6 +1,7 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from backend.core.websocket import manager
 from backend.core.security import get_current_user # 자체 구현된 JWT 검증 로직 임포트
+from backend.models.guardian import Guardian
 
 router = APIRouter()
 
@@ -27,7 +28,7 @@ async def websocket_endpoint(websocket: WebSocket):
         
     try:
         # 1. Bearer 토큰(여기서는 Query Param) 검증 및 ID 추출
-        guardian_id = await get_guardian_from_token(token)
+        guardian_id = await get_guardian_from_token(access_token)
     except Exception:
         await websocket.close(code=1008) # Policy Violation
         return

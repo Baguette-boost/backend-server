@@ -8,11 +8,14 @@ class GPSPoint(BaseModel):
     latitude: float
     longitude: float
 
+class GPSData(GPSPoint):
+    battery: int = Field(Default=-1)
+    is_fall_detected: bool = Field(default=False)
+    is_wandering_detected: bool = Field(default=False)
+
 class GPSRequest(BaseModel):
     personId: int
-    gps: GPSPoint
-
-# TODO: GPSCommon과 GPSRequest의 형태로 수정
+    gps: GPSData
 
 # --- 2. 낙상 의심 (IMU) 관련 스키마 ---
 class IMUData(BaseModel):

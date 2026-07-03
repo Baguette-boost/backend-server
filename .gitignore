@@ -1,2 +1,5 @@
 # environment file
 .env
+
+# 가상환경
+.venv

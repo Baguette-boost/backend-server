@@ -14,6 +14,8 @@ from sqlalchemy import select
 
 from backend.database import get_db, get_independent_session  # DB 의존성 주입
 from backend.models.telemetry import GpsLog
+from backend.schemas.ai import AIPredictRequest
+from backend.services.notification_service import NotificationService
 
 import os
 from dotenv import load_dotenv
@@ -28,8 +30,9 @@ telemetry_router = APIRouter(
 )
 
 
-# Background Task 용 비동기 함수
+# Background Task용 비동기 함수들
 
+# DB에 gps 데이터 INSERT
 async def async_insert_gps_log(person_id: int, gps_data: dict):
     """(Background) DB의 gps_logs 테이블에 비동기 INSERT 수행"""
     raw_timestamp = gps_data.get("timestamp")
@@ -64,20 +67,36 @@ async def receive_gps(
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    [디바이스 -> 서버] 10초 주기로 전송되는 GPS 데이터 수신
-    """
+    """ [디바이스 -> 서버] 10초 주기로 전송되는 GPS 데이터 수신 """
     # 직렬화를 위해 Pydantic 모델을 dict로 변환 (timestamp도 문자열로)
     gps_dict = request.gps.dict()
-    gps_dict['timestamp'] = gps_dict['timestamp'].isoformat() + 'Z'
+    gps_dict['timestamp'] = gps_dict['timestamp'].isoformat()
     
     # 1. 인메모리 전역 deque 버퍼에 즉시 적재 (가장 오래된 데이터는 자동 pop)
     add_gps_to_buffer(request.personId, gps_dict)
     
     # 2. DB Insert는 백그라운드로 넘겨 API 응답 속도 최적화
     background_tasks.add_task(async_insert_gps_log, request.personId, gps_dict)
+
+    # AI 분석용 payload 구성
+    # raw_timestamp = datetime.fromisoformat(request.gps.timestamp.replace('Z', ''))
+    # clean_timestamp = raw_timestamp.replace(tzinfo=None) if raw_timestamp else datetime.now()
+    clean_timestamp = request.gps.timestamp.isoformat()
+
+    imu_dict = None
+    gps_list = get_patient_gps_history(request.personId)
     
-    return {"status": "success", "message": "GPS buffered"}
+    payload = AIPredictRequest(
+        personId=request.personId,
+        timestamp=clean_timestamp,
+        imuData=imu_dict,
+        gpsData=gps_list
+    )
+    
+    # AI + 알림 로직을 백그라운드로 위임 -> API 응답 속도 최적화
+    background_tasks.add_task(NotificationService.broadcast_event, db=None, guardian_id=None, event_type=None, person_id=request.personId, payload_data=None, payload=payload)
+    
+    return {"status": "success", "message": "Data received and AI analysis started"}
 
 
 @telemetry_router.post("/fall-suspect", status_code=status.HTTP_202_ACCEPTED) # POST /telemetry/fall-suspect

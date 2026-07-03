@@ -9,21 +9,68 @@ from backend.core.websocket import manager
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from backend.database import get_db
+from backend.database import get_db, get_independent_session
 from backend.models.guardian import Guardian
 from backend.models.person import TrackedPerson
 from backend.schemas.ai import AIPredictRequest
 from backend.services.ai_client import ai_client
-from backend.database import get_independent_session
 import httpx
 
 logger = logging.getLogger(__name__)
+
+async def get_guardian_token_and_name(person_id: int) -> dict:
+    """환자 ID를 통해 보호자의 ID 및 Expo Push 토큰을 비동기로 안전하게 조회"""
+    async with get_independent_session() as db:
+        stmt = (
+            select(TrackedPerson.guardian_id, Guardian.expo_token)
+            .join(Guardian, TrackedPerson.guardian_id == Guardian.id)
+            .where(TrackedPerson.id == person_id)
+        )
+        res = await db.execute(stmt)
+        row = res.first()
+        if row:
+            return {"guardian_id": row[0], "expo_token": row[1]}
+    return None
+
+async def send_emergency_push(expo_token: str, elder_name: str, alert_type: str):
+    """ Expo Push API를 비동기(논블로킹)로 호출하여 실기기 알림을 전송하는 함수 """
+    if not expo_token or not expo_token.startswith("ExponentPushToken["):
+        logger.error(f"잘못된 Expo 토큰 형식입니다: {expo_token}")
+        return
+
+    expo_push_url = "https://exp.host/--/api/v2/push/send" # expo push service의 rest api 엔드포인트
+    
+    # 알림 타입에 따른 메시지 분기
+    body_msg = "낙상이 감지되었습니다. 즉시 확인해주세요!" if alert_type == "fall_detected" else "설정된 안심 구역을 이탈하셨습니다."
+
+    payload = {
+        "to": expo_token,
+        "sound": "default",
+        "title": f"🚨 긴급 알림: {elder_name} 어르신",
+        "body": body_msg,
+        "priority": "high",
+        "data": {"screen": "EmergencyMap", "alert_type": alert_type}
+    }
+
+    # 비동기 HTTP 클라이언트를 사용하여 메인 스레드 블로킹 방지
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(expo_push_url, json=payload, timeout=5.0)
+            result = response.json()
+            
+            # Expo 서버 자체는 200 OK를 주더라도, 내부 데이터에 에러가 있을 수 있음
+            if "data" in result and result["data"].get("status") == "error":
+                logger.error(f"Expo 푸시 발송 에러 (토큰 만료 등): {result['data'].get('details')}")
+            else:
+                logger.info(f"[{elder_name}] 푸시 발송 성공!")
+                
+        except httpx.RequestError as e:
+            logger.error(f"Expo API 네트워크 통신 에러: {str(e)}")
 
 class NotificationService:
     @staticmethod
     async def broadcast_event(db: AsyncSession, guardian_id: int, event_type: str, person_id: str, payload_data: dict, payload: AIPredictRequest):
         """
-        웹소켓 이벤트 브로드캐스팅용 함수
         WebSocket(대시보드용)과 Expo Push(모바일용)를 비동기적으로 동시 실행.
         event_type: 'location', 'telemetry', 'status', 'alert' 중 하나
         """
@@ -45,8 +92,9 @@ class NotificationService:
                 async with get_independent_session() as db:
                     stmt_guard = select(TrackedPerson).where(TrackedPerson.id == person_id)
                     rst = (await db.execute(stmt_guard)).scalar_one_or_none()
-                    guardian_id = rst.guardian_id
-                    name = rst.name
+                    if rst:
+                        guardian_id = rst.guardian_id
+                        name = rst.name
                 
                 if guardian_id:
                     # 앱으로 보낼 페이로드 구성
@@ -101,19 +149,25 @@ class NotificationService:
         ws_task = manager.send_personal_message(message_payload, guardian_id)
 
         # 2. Expo Push 전송 태스크
-        expo_task = NotificationService._send_expo_push(db, guardian_id, {"type": return_type}) if payload else NotificationService._send_expo_push(db, guardian_id, payload_data)
+        if payload:
+            expo_task = NotificationService._send_expo_push(db, guardian_id, {"type": return_type})
+        else:
+            expo_task = NotificationService._send_expo_push(db, guardian_id, payload_data)
 
         # 두 작업을 병렬로 동시 실행 (I/O 병목 방지)
         results = await asyncio.gather(ws_task, expo_task, return_exceptions=True)
         
         for result in results:
             if isinstance(result, Exception):
-                logger.error(f"Alert task failed: {result}")
+                logger.error(f"Notification task failed: {result}")
 
     @staticmethod
     async def _send_expo_push(db: AsyncSession, guardian_id: int, extra_data: dict = None):
-        """Expo Push 발송 로직 (비동기 스레드 풀에서 실행)"""
+        """기존 sdk 기반 Expo Push 발송 로직 (비동기 스레드 풀에서 실행)"""
         # DB에서 guardian_id에 매핑된 Expo 푸시 토큰 조회
+        if not db or not guardian_id:
+            return
+
         stmt = select(Guardian.expo_token).where(
             Guardian.id == guardian_id
         )
@@ -121,26 +175,21 @@ class NotificationService:
         expo_token = (await db.execute(stmt)).scalars().first()
 
         if not expo_token:
-            logger.info(f"Guardian {guardian_id} has no expo token. Skipping push notification")
+            logger.info(f"no expo token. Skipping push notification")
             return
 
         alert_type = extra_data.get("type") if extra_data else None
 
-        title = "알림"
-        body = "새로운 상태 업데이트가 있습니다."
+        title, body = "알림", "새로운 상태 업데이트가 있습니다."
 
         if alert_type == 'zone_exit':
-            title = "🚨 안전 구역 이탈"
-            body = "안전 구역 이탈이 감지되었습니다"
-        elif alert_type == 'low_battery':
-            title = "🚨 배터리 부족"
-            body = "기기 배터리가 부족합니다"
+            title, body = "🚨 안전 구역 이탈", "안전 구역 이탈이 감지되었습니다"
         elif alert_type == 'fall_detected':
-            title = "🚨 위험 상황 발생"
-            body = "낙상이 감지되었습니다"
-        elif alert_type == 'offline':
-            title = "🚨 오프라인"
-            body = "기기가 오프라인 상태입니다"
+            title, body = "🚨 위험 상황 발생", "낙상이 감지되었습니다"
+        # elif alert_type == 'low_battery':
+        #     title, body = "🚨 배터리 부족", "기기 배터리가 부족합니다"
+        # elif alert_type == 'offline':
+        #     title, body = "🚨 오프라인", "기기가 오프라인 상태입니다"
 
         try:
             # Expo 푸시 메시지 객체 생성
@@ -154,53 +203,11 @@ class NotificationService:
             )
 
             # SDK publish가 동기 함수이므로 to_thread를 통해 비동기 처리
-            response = await asyncio.to_thread(PushClient().publish, message)
+            await asyncio.to_thread(PushClient().publish, message)
             
             # response.is_error 등 Expo 고유의 에러 응답 포맷 검증 가능
-            logger.info(f"Successfully sent Expo push message. ID: {response.id}")
+            logger.info(f"Successfully sent Expo push message")
             
-        except PushServerError as e:
-            logger.error(f"Expo push validation/sending failed for guardian {guardian_id}: {e}")
-            raise e
         except Exception as e:
             logger.error(f"Unexpected error during Expo push: {e}")
             raise e
-
-
-async def send_emergency_push(expo_token: str, elder_name: str, alert_type: str):
-    """ Expo Push API를 비동기(논블로킹)로 호출하여 실기기 알림을 전송하는 함수 """
-    if not expo_token or not expo_token.startswith("ExponentPushToken["):
-        logger.error(f"잘못된 Expo 토큰 형식입니다: {expo_token}")
-        return
-
-    expo_push_url = "https://exp.host/--/api/v2/push/send" # expo push service의 rest api 엔드포인트
-    
-    # 알림 타입에 따른 메시지 분기
-    if alert_type == "fall_detected":
-        body_msg = "낙상이 감지되었습니다. 즉시 확인해주세요!"
-    else:
-        body_msg = "설정된 안심 구역을 이탈하셨습니다."
-
-    payload = {
-        "to": expo_token,
-        "sound": "default",
-        "title": f"🚨 긴급 알림: {elder_name} 어르신",
-        "body": body_msg,
-        "priority": "high",
-        "data": {"screen": "EmergencyMap", "alert_type": alert_type}
-    }
-
-    # 비동기 HTTP 클라이언트를 사용하여 메인 스레드 블로킹 방지
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.post(expo_push_url, json=payload, timeout=5.0)
-            result = response.json()
-            
-            # Expo 서버 자체는 200 OK를 주더라도, 내부 데이터에 에러가 있을 수 있음
-            if "data" in result and result["data"].get("status") == "error":
-                logger.error(f"Expo 푸시 발송 에러 (토큰 만료 등): {result['data'].get('details')}")
-            else:
-                logger.info(f"[{elder_name}] 푸시 발송 성공!")
-                
-        except httpx.RequestError as e:
-            logger.error(f"Expo API 네트워크 통신 에러: {str(e)}")

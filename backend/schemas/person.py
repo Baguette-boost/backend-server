@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, model_serializer
 from typing import List, Optional
 from datetime import datetime
 
@@ -11,12 +11,13 @@ class PersonResponse(BaseModel):
     id: int
     name: str
     age: int
+    device_id: str = Field(..., alias="deviceId", description="디바이스 id")
     device_token: str = Field(..., alias="deviceToken", description="디바이스 식별 토큰")
     created_at: datetime = Field(..., alias="createdAt")
 
     # 해당 pydantic 모델의 동작 방식을 제어하는 규칙 설정
     model_config = ConfigDict(
-        populate_by_name = True # 필드 이름과 별칭 모두 허용
+        populate_by_name = True, # 필드 이름과 별칭 모두 허용
         from_attributes = True  # orm 객체 등을 pydantic 모델로 자동 매핑
     )
 
@@ -26,7 +27,7 @@ class LocationAbstractResponse(BaseModel):
     updated_at: datetime = Field(..., alias="updatedAt")
 
     model_config = ConfigDict(
-        populate_by_name = True
+        populate_by_name = True,
         from_attributes = True
     )
 
@@ -50,7 +51,7 @@ class LocationResponse(BaseModel):
         return result
 
     model_config = ConfigDict(
-        populate_by_name = True
+        populate_by_name = True,
         from_attributes = True
     )
     

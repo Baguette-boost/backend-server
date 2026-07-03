@@ -1,12 +1,13 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, status, HTTPException
 from aiomysql import Pool # 기존에 세팅한 커넥션 풀
 import logging
+from datetime import datetime
 
 from backend.schemas.telemetry import GPSRequest, FallSuspectRequest
 from backend.core.buffer import add_gps_to_buffer, get_patient_gps_history
-from backend.main import verify_device_token # 디바이스 인증 의존성 주입
+from backend.core.security import verify_device_token # 디바이스 인증 의존성 주입
 
-from backend.services.ai_client import predict
+from backend.services.ai_client import ai_client
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -20,7 +21,7 @@ from dotenv import load_dotenv
 load_dotenv() # .env 파일 로드
 
 logger = logging.getLogger(__name__)
-router = APIRouter(
+telemetry_router = APIRouter(
     prefix="/telemetry",
     tags=["Telemetry"],
     dependencies=[Depends(verify_device_token)]
@@ -31,24 +32,33 @@ router = APIRouter(
 
 async def async_insert_gps_log(person_id: int, gps_data: dict):
     """(Background) DB의 gps_logs 테이블에 비동기 INSERT 수행"""
+    raw_timestamp = gps_data.get("timestamp")
+
+    # datetime 객체로 복구
+    if isinstance(raw_timestamp, str):
+        raw_timestamp = datetime.fromisoformat(raw_timestamp.replace('Z', ''))
+        
+    clean_timestamp = raw_timestamp.replace(tzinfo=None) if raw_timestamp else datetime.now()
+    
     async with get_independent_session() as db:
         new_gps = GpsLog(
-            "person_id"=person_id,
-            "latitude"=gps_data["latitude"],
-            "longitude"=gps_data["longitude"],
-            "battery"=gps_data["battery"],
-            "is_fall_detected"=gps_data.get("is_fall_detected", False),
-            "is_wandering_detected"=gps_data.get("is_wandering_detected", False),
-            "created_at"=gps_data.get("timestamp")
+            person_id=person_id,
+            latitude=gps_data["latitude"],
+            longitude=gps_data["longitude"],
+            battery=gps_data["battery"],
+            is_fall_detected=gps_data.get("is_fall_detected", False),
+            is_wandering_detected=gps_data.get("is_wandering_detected", False),
+            created_at=clean_timestamp
         )
 
         logger.info(f"[DB INSERT] personId: {person_id}, gps: {gps_data}")
 
         db.add(new_gps)
+        await db.commit()
 
 # API Endpoints
 
-@router.post("/gps", status_code=status.HTTP_201_CREATED) # POST /telemetry/gps
+@telemetry_router.post("/gps", status_code=status.HTTP_201_CREATED) # POST /telemetry/gps
 async def receive_gps(
     request: GPSRequest, 
     background_tasks: BackgroundTasks,
@@ -70,7 +80,7 @@ async def receive_gps(
     return {"status": "success", "message": "GPS buffered"}
 
 
-@router.post("/fall-suspect", status_code=status.HTTP_202_ACCEPTED) # POST /telemetry/fall-suspect
+@telemetry_router.post("/fall-suspect", status_code=status.HTTP_202_ACCEPTED) # POST /telemetry/fall-suspect
 async def receive_fall_suspect(
     request: FallSuspectRequest, 
     background_tasks: BackgroundTasks
@@ -85,15 +95,15 @@ async def receive_fall_suspect(
 
     # AI 서버 규약에 맞게 페이로드 구성
     payload = AIPredictRequest(
-        "personId"=request.personId,
-        "timestamp"=timestamp_str,
-        "imuData"=imu_dict,
-        "gpsData"=gps_list
+        personId=request.personId,
+        timestamp=timestamp_str,
+        imuData=imu_dict,
+        gpsData=gps_list
     )
     
     # 1. 디바이스에는 즉각적으로 202 Accepted 응답을 반환하기 위해 AI 통신을 백그라운드로 위임
     background_tasks.add_task(
-        predict,
+        ai_client.predict,
         payload
     )
     

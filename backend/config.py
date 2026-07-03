@@ -2,7 +2,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     DATABASE_URL: str
-    JWT_SECRET: str
+    SECRET_KEY: str
+    DEBUG_MODE: bool
     AI_SERVICE_URL: str
     AI_REQUEST_TIMEOUT: int = 5 # 타임아웃 5초 설정
     MYSQL_ROOT_PASSWORD: str

@@ -9,19 +9,20 @@ from sqlalchemy import select
 from backend.database import get_db
 from backend.models.person import TrackedPerson
 from backend.models.alert import AlertLog
+from backend.models.guardian import Guardian
 
-router = APIRouter(prefix="/alerts", tags=["Alerts"])
+alert_router = APIRouter(prefix="/alerts", tags=["Alerts"])
 
-@router.get("", response_model=List[AlertResponse])
+@alert_router.get("", response_model=List[AlertResponse])
 async def get_alert_logs(
     limit: int = 50,
-    current_guardian: dict = Depends(get_current_user),
+    current_guardian: Guardian = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """시간 역순 위험 이력 목록 조회"""
     # 1. current_guardian['id']가 관리하는 환자들의 ID 목록 추출
     stmt_ids = select(TrackedPerson.id).where( # current_guardian['user_id']와 jwt 페이로드 키 부분 확인
-        TrackedPerson.guardian_id == current_guardian['id']
+        TrackedPerson.guardian_id == current_guardian.id
     )
     id_list = (await db.execute(stmt)).scalars().all()
 

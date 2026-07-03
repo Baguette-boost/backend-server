@@ -1,0 +1,1233 @@
+{
+  "model_type": "iccas_parallel_sensor_lstm_classifier",
+  "sensor_stream": "gps",
+  "feature_columns": [
+    "x_m",
+    "y_m",
+    "dx_m",
+    "dy_m",
+    "speed_mps",
+    "dt_s",
+    "gps_valid"
+  ],
+  "class_labels": [
+    "walk",
+    "wandering",
+    "fall",
+    "sit",
+    "idle"
+  ],
+  "sequence_length": 16,
+  "hidden_size": 64,
+  "num_layers": 2,
+  "dropout": 0.2,
+  "scaler_center": [
+    5.0869011878967285,
+    77.16938781738281,
+    0.0,
+    0.0,
+    0.0,
+    0.03999999910593033,
+    1.0
+  ],
+  "scaler_scale": [
+    2568.974365234375,
+    649.9352416992188,
+    1.3508847951889038,
+    3.131732940673828,
+    7.117586135864258,
+    0.019999999552965164,
+    1.0
+  ],
+  "history": [
+    {
+      "epoch": 1.0,
+      "train_loss": 1.1720225464541616,
+      "validation_accuracy": 0.3462371413102328,
+      "validation_macro_f1": 0.2705890024339507
+    },
+    {
+      "epoch": 2.0,
+      "train_loss": 0.8816837644415156,
+      "validation_accuracy": 0.35598267460747157,
+      "validation_macro_f1": 0.306261341487985
+    },
+    {
+      "epoch": 3.0,
+      "train_loss": 0.7101773439433607,
+      "validation_accuracy": 0.40416892257715215,
+      "validation_macro_f1": 0.36449785687429576
+    },
+    {
+      "epoch": 4.0,
+      "train_loss": 0.5974222397296516,
+      "validation_accuracy": 0.6166756903086086,
+      "validation_macro_f1": 0.5625318693238536
+    },
+    {
+      "epoch": 5.0,
+      "train_loss": 0.5214029033538365,
+      "validation_accuracy": 0.7807255008121278,
+      "validation_macro_f1": 0.6044170938502665
+    },
+    {
+      "epoch": 6.0,
+      "train_loss": 0.49283648838932137,
+      "validation_accuracy": 0.8213318895506226,
+      "validation_macro_f1": 0.7246463404573671
+    },
+    {
+      "epoch": 7.0,
+      "train_loss": 0.36924675638439247,
+      "validation_accuracy": 0.8280996210070385,
+      "validation_macro_f1": 0.7420375123476161
+    },
+    {
+      "epoch": 8.0,
+      "train_loss": 0.3631244571284493,
+      "validation_accuracy": 0.7693557119653492,
+      "validation_macro_f1": 0.6738453634211583
+    },
+    {
+      "epoch": 9.0,
+      "train_loss": 0.30373149039761516,
+      "validation_accuracy": 0.834325933946941,
+      "validation_macro_f1": 0.7262649980067025
+    },
+    {
+      "epoch": 10.0,
+      "train_loss": 0.31744185004287995,
+      "validation_accuracy": 0.8237682728749324,
+      "validation_macro_f1": 0.6829109980204323
+    },
+    {
+      "epoch": 11.0,
+      "train_loss": 0.3111509948386088,
+      "validation_accuracy": 0.8118570655116405,
+      "validation_macro_f1": 0.6994672360252829
+    },
+    {
+      "epoch": 12.0,
+      "train_loss": 0.2718147421596719,
+      "validation_accuracy": 0.8080671358960476,
+      "validation_macro_f1": 0.674242649896602
+    },
+    {
+      "epoch": 13.0,
+      "train_loss": 0.29000162287810716,
+      "validation_accuracy": 0.8356794802382241,
+      "validation_macro_f1": 0.7473440007519064
+    },
+    {
+      "epoch": 14.0,
+      "train_loss": 0.22476784538276404,
+      "validation_accuracy": 0.8153762858689767,
+      "validation_macro_f1": 0.68882651916108
+    },
+    {
+      "epoch": 15.0,
+      "train_loss": 0.2567789709409613,
+      "validation_accuracy": 0.8194369247428263,
+      "validation_macro_f1": 0.7427255533993032
+    },
+    {
+      "epoch": 16.0,
+      "train_loss": 0.2457094548107653,
+      "validation_accuracy": 0.8121277747698972,
+      "validation_macro_f1": 0.7057757535775231
+    },
+    {
+      "epoch": 17.0,
+      "train_loss": 0.19829158156959759,
+      "validation_accuracy": 0.8478613968597726,
+      "validation_macro_f1": 0.7394995382243114
+    },
+    {
+      "epoch": 18.0,
+      "train_loss": 0.24748209520403994,
+      "validation_accuracy": 0.7926367081754196,
+      "validation_macro_f1": 0.7360990227256459
+    },
+    {
+      "epoch": 19.0,
+      "train_loss": 0.20676165874853972,
+      "validation_accuracy": 0.8080671358960476,
+      "validation_macro_f1": 0.7630446185669664
+    },
+    {
+      "epoch": 20.0,
+      "train_loss": 0.1981624965845366,
+      "validation_accuracy": 0.8183540877097997,
+      "validation_macro_f1": 0.623295433815507
+    },
+    {
+      "epoch": 21.0,
+      "train_loss": 0.16816404573232419,
+      "validation_accuracy": 0.8297238765565782,
+      "validation_macro_f1": 0.7363974168972469
+    },
+    {
+      "epoch": 22.0,
+      "train_loss": 0.20310527991542604,
+      "validation_accuracy": 0.8040064970221982,
+      "validation_macro_f1": 0.5799078616664579
+    },
+    {
+      "epoch": 23.0,
+      "train_loss": 0.17789695352473275,
+      "validation_accuracy": 0.8267460747157552,
+      "validation_macro_f1": 0.7087013883179237
+    },
+    {
+      "epoch": 24.0,
+      "train_loss": 0.1916659865030069,
+      "validation_accuracy": 0.8251218191662155,
+      "validation_macro_f1": 0.6933018656753805
+    },
+    {
+      "epoch": 25.0,
+      "train_loss": 0.1449442457422629,
+      "validation_accuracy": 0.8278289117487818,
+      "validation_macro_f1": 0.71461920974242
+    },
+    {
+      "epoch": 26.0,
+      "train_loss": 0.15863695380557388,
+      "validation_accuracy": 0.8145641580942068,
+      "validation_macro_f1": 0.7107348288270378
+    },
+    {
+      "epoch": 27.0,
+      "train_loss": 0.12668505799041943,
+      "validation_accuracy": 0.8264753654574987,
+      "validation_macro_f1": 0.665768268025115
+    },
+    {
+      "epoch": 28.0,
+      "train_loss": 0.17151069156693677,
+      "validation_accuracy": 0.8324309691391446,
+      "validation_macro_f1": 0.7503617931029176
+    },
+    {
+      "epoch": 29.0,
+      "train_loss": 0.15714283604779053,
+      "validation_accuracy": 0.8050893340552246,
+      "validation_macro_f1": 0.7008969821393016
+    },
+    {
+      "epoch": 30.0,
+      "train_loss": 0.16483034286123818,
+      "validation_accuracy": 0.8091499729290742,
+      "validation_macro_f1": 0.6996054686375028
+    },
+    {
+      "epoch": 31.0,
+      "train_loss": 0.12754311836572418,
+      "validation_accuracy": 0.7985923118570655,
+      "validation_macro_f1": 0.6671650974568818
+    },
+    {
+      "epoch": 32.0,
+      "train_loss": 0.1301733048656844,
+      "validation_accuracy": 0.8294531672983216,
+      "validation_macro_f1": 0.7292637987405796
+    },
+    {
+      "epoch": 33.0,
+      "train_loss": 0.11014174035840743,
+      "validation_accuracy": 0.8465078505684894,
+      "validation_macro_f1": 0.7348479388695998
+    },
+    {
+      "epoch": 34.0,
+      "train_loss": 0.11182540258471486,
+      "validation_accuracy": 0.8094206821873308,
+      "validation_macro_f1": 0.7229770597218607
+    },
+    {
+      "epoch": 35.0,
+      "train_loss": 0.16891412491653618,
+      "validation_accuracy": 0.8280996210070385,
+      "validation_macro_f1": 0.7168153834880522
+    }
+  ],
+  "split_sizes": {
+    "train": 17233,
+    "validation": 3694,
+    "test": 3697
+  },
+  "test_metrics": {
+    "accuracy": 0.8882878009196646,
+    "macro_precision": 0.8212296650423051,
+    "macro_recall": 0.7323219639173935,
+    "macro_f1": 0.6757547929371126,
+    "weighted_f1": 0.8929913165245164,
+    "total": 3697,
+    "correct": 3284,
+    "confusion_matrix": [
+      [
+        974,
+        0,
+        28,
+        1,
+        192
+      ],
+      [
+        0,
+        1844,
+        1,
+        0,
+        4
+      ],
+      [
+        0,
+        100,
+        309,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        9,
+        87
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        148
+      ]
+    ],
+    "labels": [
+      "walk",
+      "wandering",
+      "fall",
+      "sit",
+      "idle"
+    ],
+    "per_class": {
+      "walk": {
+        "precision": 1.0,
+        "recall": 0.8150627615062761,
+        "f1": 0.8981097279852467,
+        "support": 1195
+      },
+      "wandering": {
+        "precision": 0.948559670781893,
+        "recall": 0.9972958355868037,
+        "f1": 0.9723174268389138,
+        "support": 1849
+      },
+      "fall": {
+        "precision": 0.9142011834319527,
+        "recall": 0.7555012224938875,
+        "f1": 0.8273092369477912,
+        "support": 409
+      },
+      "sit": {
+        "precision": 0.9,
+        "recall": 0.09375,
+        "f1": 0.169811320754717,
+        "support": 96
+      },
+      "idle": {
+        "precision": 0.3433874709976798,
+        "recall": 1.0,
+        "f1": 0.5112262521588946,
+        "support": 148
+      }
+    }
+  },
+  "test_metrics_by_scenario": {
+    "idle": {
+      "accuracy": 1.0,
+      "macro_precision": 0.2,
+      "macro_recall": 0.2,
+      "macro_f1": 0.2,
+      "weighted_f1": 1.0,
+      "total": 148,
+      "correct": 148,
+      "confusion_matrix": [
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          148
+        ]
+      ],
+      "labels": [
+        "walk",
+        "wandering",
+        "fall",
+        "sit",
+        "idle"
+      ],
+      "per_class": {
+        "walk": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "wandering": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "fall": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "sit": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "idle": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "support": 148
+        }
+      }
+    },
+    "sit": {
+      "accuracy": 0.09375,
+      "macro_precision": 0.2,
+      "macro_recall": 0.01875,
+      "macro_f1": 0.03428571428571429,
+      "weighted_f1": 0.17142857142857143,
+      "total": 96,
+      "correct": 9,
+      "confusion_matrix": [
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          9,
+          87
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      ],
+      "labels": [
+        "walk",
+        "wandering",
+        "fall",
+        "sit",
+        "idle"
+      ],
+      "per_class": {
+        "walk": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "wandering": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "fall": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "sit": {
+          "precision": 1.0,
+          "recall": 0.09375,
+          "f1": 0.17142857142857143,
+          "support": 96
+        },
+        "idle": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        }
+      }
+    },
+    "떨어졌다가 앞으로 걸어가고 떨어졌다 앞으로 걸어감": {
+      "accuracy": 0.8172043010752689,
+      "macro_precision": 0.2,
+      "macro_recall": 0.16344086021505377,
+      "macro_f1": 0.17988165680473372,
+      "weighted_f1": 0.8994082840236686,
+      "total": 186,
+      "correct": 152,
+      "confusion_matrix": [
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          34,
+          152,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      ],
+      "labels": [
+        "walk",
+        "wandering",
+        "fall",
+        "sit",
+        "idle"
+      ],
+      "per_class": {
+        "walk": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "wandering": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "fall": {
+          "precision": 1.0,
+          "recall": 0.8172043010752689,
+          "f1": 0.8994082840236686,
+          "support": 186
+        },
+        "sit": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "idle": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        }
+      }
+    },
+    "새로운 경로 1.2km, 새로운 경로 600m": {
+      "accuracy": 0.9960967993754879,
+      "macro_precision": 0.2,
+      "macro_recall": 0.1992193598750976,
+      "macro_f1": 0.19960891669925693,
+      "weighted_f1": 0.9980445834962847,
+      "total": 1281,
+      "correct": 1276,
+      "confusion_matrix": [
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          1276,
+          1,
+          0,
+          4
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      ],
+      "labels": [
+        "walk",
+        "wandering",
+        "fall",
+        "sit",
+        "idle"
+      ],
+      "per_class": {
+        "walk": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "wandering": {
+          "precision": 1.0,
+          "recall": 0.9960967993754879,
+          "f1": 0.9980445834962847,
+          "support": 1281
+        },
+        "fall": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "sit": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "idle": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        }
+      }
+    },
+    "새로운 경로에서 배회": {
+      "accuracy": 1.0,
+      "macro_precision": 0.2,
+      "macro_recall": 0.2,
+      "macro_f1": 0.2,
+      "weighted_f1": 1.0,
+      "total": 568,
+      "correct": 568,
+      "confusion_matrix": [
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          568,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      ],
+      "labels": [
+        "walk",
+        "wandering",
+        "fall",
+        "sit",
+        "idle"
+      ],
+      "per_class": {
+        "walk": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "wandering": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "support": 568
+        },
+        "fall": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "sit": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "idle": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        }
+      }
+    },
+    "제자리에서 떨어짐1,2": {
+      "accuracy": 0.7040358744394619,
+      "macro_precision": 0.2,
+      "macro_recall": 0.14080717488789238,
+      "macro_f1": 0.16526315789473683,
+      "weighted_f1": 0.8263157894736842,
+      "total": 223,
+      "correct": 157,
+      "confusion_matrix": [
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          66,
+          157,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      ],
+      "labels": [
+        "walk",
+        "wandering",
+        "fall",
+        "sit",
+        "idle"
+      ],
+      "per_class": {
+        "walk": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "wandering": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "fall": {
+          "precision": 1.0,
+          "recall": 0.7040358744394619,
+          "f1": 0.8263157894736842,
+          "support": 223
+        },
+        "sit": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "idle": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        }
+      }
+    },
+    "집 앞 walk": {
+      "accuracy": 0.07531380753138076,
+      "macro_precision": 0.2,
+      "macro_recall": 0.01506276150627615,
+      "macro_f1": 0.02801556420233463,
+      "weighted_f1": 0.14007782101167315,
+      "total": 239,
+      "correct": 18,
+      "confusion_matrix": [
+        [
+          18,
+          0,
+          28,
+          1,
+          192
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      ],
+      "labels": [
+        "walk",
+        "wandering",
+        "fall",
+        "sit",
+        "idle"
+      ],
+      "per_class": {
+        "walk": {
+          "precision": 1.0,
+          "recall": 0.07531380753138076,
+          "f1": 0.14007782101167315,
+          "support": 239
+        },
+        "wandering": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "fall": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "sit": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "idle": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        }
+      }
+    },
+    "추가된 학교 데이터": {
+      "accuracy": 1.0,
+      "macro_precision": 0.2,
+      "macro_recall": 0.2,
+      "macro_f1": 0.2,
+      "weighted_f1": 1.0,
+      "total": 793,
+      "correct": 793,
+      "confusion_matrix": [
+        [
+          793,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      ],
+      "labels": [
+        "walk",
+        "wandering",
+        "fall",
+        "sit",
+        "idle"
+      ],
+      "per_class": {
+        "walk": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "support": 793
+        },
+        "wandering": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "fall": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "sit": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "idle": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        }
+      }
+    },
+    "학교 walk": {
+      "accuracy": 1.0,
+      "macro_precision": 0.2,
+      "macro_recall": 0.2,
+      "macro_f1": 0.2,
+      "weighted_f1": 1.0,
+      "total": 163,
+      "correct": 163,
+      "confusion_matrix": [
+        [
+          163,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      ],
+      "labels": [
+        "walk",
+        "wandering",
+        "fall",
+        "sit",
+        "idle"
+      ],
+      "per_class": {
+        "walk": {
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0,
+          "support": 163
+        },
+        "wandering": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "fall": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "sit": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "idle": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        }
+      }
+    }
+  },
+  "sample_predictions": [
+    {
+      "scenario": "추가된 학교 데이터",
+      "true": "walk",
+      "predicted": "walk",
+      "confidence": 0.9997747540473938
+    },
+    {
+      "scenario": "추가된 학교 데이터",
+      "true": "walk",
+      "predicted": "walk",
+      "confidence": 0.999725878238678
+    },
+    {
+      "scenario": "추가된 학교 데이터",
+      "true": "walk",
+      "predicted": "walk",
+      "confidence": 0.9997124075889587
+    },
+    {
+      "scenario": "추가된 학교 데이터",
+      "true": "walk",
+      "predicted": "walk",
+      "confidence": 0.9997493624687195
+    },
+    {
+      "scenario": "추가된 학교 데이터",
+      "true": "walk",
+      "predicted": "walk",
+      "confidence": 0.9997336268424988
+    },
+    {
+      "scenario": "추가된 학교 데이터",
+      "true": "walk",
+      "predicted": "walk",
+      "confidence": 0.9997367262840271
+    },
+    {
+      "scenario": "추가된 학교 데이터",
+      "true": "walk",
+      "predicted": "walk",
+      "confidence": 0.9996336698532104
+    },
+    {
+      "scenario": "추가된 학교 데이터",
+      "true": "walk",
+      "predicted": "walk",
+      "confidence": 0.9997742772102356
+    },
+    {
+      "scenario": "추가된 학교 데이터",
+      "true": "walk",
+      "predicted": "walk",
+      "confidence": 0.9988897442817688
+    },
+    {
+      "scenario": "추가된 학교 데이터",
+      "true": "walk",
+      "predicted": "walk",
+      "confidence": 0.9997084736824036
+    },
+    {
+      "scenario": "추가된 학교 데이터",
+      "true": "walk",
+      "predicted": "walk",
+      "confidence": 0.9997379183769226
+    },
+    {
+      "scenario": "추가된 학교 데이터",
+      "true": "walk",
+      "predicted": "walk",
+      "confidence": 0.9997517466545105
+    },
+    {
+      "scenario": "추가된 학교 데이터",
+      "true": "walk",
+      "predicted": "walk",
+      "confidence": 0.9864641427993774
+    },
+    {
+      "scenario": "추가된 학교 데이터",
+      "true": "walk",
+      "predicted": "walk",
+      "confidence": 0.9997393488883972
+    },
+    {
+      "scenario": "추가된 학교 데이터",
+      "true": "walk",
+      "predicted": "walk",
+      "confidence": 0.9997794032096863
+    },
+    {
+      "scenario": "추가된 학교 데이터",
+      "true": "walk",
+      "predicted": "walk",
+      "confidence": 0.999762237071991
+    },
+    {
+      "scenario": "추가된 학교 데이터",
+      "true": "walk",
+      "predicted": "walk",
+      "confidence": 0.9994221925735474
+    },
+    {
+      "scenario": "추가된 학교 데이터",
+      "true": "walk",
+      "predicted": "walk",
+      "confidence": 0.9997331500053406
+    },
+    {
+      "scenario": "추가된 학교 데이터",
+      "true": "walk",
+      "predicted": "walk",
+      "confidence": 0.9997348189353943
+    },
+    {
+      "scenario": "추가된 학교 데이터",
+      "true": "walk",
+      "predicted": "walk",
+      "confidence": 0.9997645020484924
+    }
+  ]
+}

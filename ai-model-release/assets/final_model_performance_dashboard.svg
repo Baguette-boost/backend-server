@@ -1,0 +1,177 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="2100" viewBox="0 0 1600 2100">
+<rect x="0" y="0" width="1600" height="2100" rx="0" fill="#f7f8fb" stroke="none"/>
+<text x="70" y="92" font-size="42" fill="#111827" font-weight="800" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">ICCAS 최종 모델 성능지표</text>
+<text x="70" y="132" font-size="22" fill="#667085" font-weight="500" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">GPS 배회 감지 + IMU 낙상 감지 서버 병렬 구조 기준</text>
+<text x="1530" y="92" font-size="20" fill="#667085" font-weight="700" text-anchor="end" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">device: MPS</text>
+<text x="1530" y="124" font-size="20" fill="#667085" font-weight="700" text-anchor="end" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">rows: 24,759</text>
+<rect x="70" y="170" width="340" height="150" rx="8" fill="#ffffff" stroke="#d9dee8"/>
+<text x="94" y="214" font-size="22" fill="#667085" font-weight="650" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">GPS 서버 F1</text>
+<text x="94" y="270" font-size="46" fill="#172033" font-weight="800" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">96.0%</text>
+<text x="94" y="302" font-size="18" fill="#667085" font-weight="500" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">fall sheet 제외</text>
+<rect x="440" y="170" width="340" height="150" rx="8" fill="#ffffff" stroke="#d9dee8"/>
+<text x="464" y="214" font-size="22" fill="#667085" font-weight="650" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">GPS 이동경로 F1</text>
+<text x="464" y="270" font-size="46" fill="#172033" font-weight="800" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">99.0%</text>
+<text x="464" y="302" font-size="18" fill="#667085" font-weight="500" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">walk/wandering</text>
+<rect x="810" y="170" width="340" height="150" rx="8" fill="#ffffff" stroke="#d9dee8"/>
+<text x="834" y="214" font-size="22" fill="#667085" font-weight="650" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">IMU 낙상 F1</text>
+<text x="834" y="270" font-size="46" fill="#172033" font-weight="800" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">86.3%</text>
+<text x="834" y="302" font-size="18" fill="#667085" font-weight="500" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">ICCAS+SisFall</text>
+<rect x="1180" y="170" width="340" height="150" rx="8" fill="#ffffff" stroke="#d9dee8"/>
+<text x="1204" y="214" font-size="22" fill="#667085" font-weight="650" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">학습 데이터</text>
+<text x="1204" y="270" font-size="46" fill="#172033" font-weight="800" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">24,759</text>
+<text x="1204" y="302" font-size="18" fill="#667085" font-weight="500" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">ICCAS_final_data</text>
+<rect x="70" y="370" width="1460" height="680" rx="8" fill="#ffffff" stroke="#d9dee8"/>
+<text x="100" y="425" font-size="28" fill="#172033" font-weight="800" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">모델별 성능 비교</text>
+<line x1="180" y1="920.0" x2="1470" y2="920.0" stroke="#e5e7eb" stroke-width="1"/>
+<text x="162" y="927.0" font-size="16" fill="#667085" font-weight="500" text-anchor="end" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">0%</text>
+<line x1="180" y1="832.0" x2="1470" y2="832.0" stroke="#e5e7eb" stroke-width="1"/>
+<text x="162" y="839.0" font-size="16" fill="#667085" font-weight="500" text-anchor="end" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">20%</text>
+<line x1="180" y1="744.0" x2="1470" y2="744.0" stroke="#e5e7eb" stroke-width="1"/>
+<text x="162" y="751.0" font-size="16" fill="#667085" font-weight="500" text-anchor="end" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">40%</text>
+<line x1="180" y1="656.0" x2="1470" y2="656.0" stroke="#e5e7eb" stroke-width="1"/>
+<text x="162" y="663.0" font-size="16" fill="#667085" font-weight="500" text-anchor="end" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">60%</text>
+<line x1="180" y1="568.0" x2="1470" y2="568.0" stroke="#e5e7eb" stroke-width="1"/>
+<text x="162" y="575.0" font-size="16" fill="#667085" font-weight="500" text-anchor="end" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">80%</text>
+<line x1="180" y1="480.0" x2="1470" y2="480.0" stroke="#e5e7eb" stroke-width="1"/>
+<text x="162" y="487.0" font-size="16" fill="#667085" font-weight="500" text-anchor="end" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">100%</text>
+<rect x="180" y="458" width="18" height="18" rx="4" fill="#2563eb" stroke="none"/>
+<text x="208" y="474" font-size="17" fill="#344054" font-weight="650" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">accuracy</text>
+<rect x="330" y="458" width="18" height="18" rx="4" fill="#059669" stroke="none"/>
+<text x="358" y="474" font-size="17" fill="#344054" font-weight="650" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">precision</text>
+<rect x="480" y="458" width="18" height="18" rx="4" fill="#d97706" stroke="none"/>
+<text x="508" y="474" font-size="17" fill="#344054" font-weight="650" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">recall</text>
+<rect x="630" y="458" width="18" height="18" rx="4" fill="#dc2626" stroke="none"/>
+<text x="658" y="474" font-size="17" fill="#344054" font-weight="650" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">f1</text>
+<text x="287.5" y="962" font-size="17" fill="#172033" font-weight="700" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">GPS Raw</text>
+<text x="287.5" y="990" font-size="14" fill="#667085" font-weight="500" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">전체 sheet</text>
+<rect x="235.5" y="518.9180416553962" width="22" height="401.0819583446038" rx="4" fill="#2563eb" stroke="none"/>
+<text x="246.5" y="510.9180416553962" font-size="12" fill="#344054" font-weight="700" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">0.91</text>
+<rect x="263.5" y="542.205466540999" width="22" height="377.79453345900095" rx="4" fill="#059669" stroke="none"/>
+<text x="274.5" y="534.205466540999" font-size="12" fill="#344054" font-weight="700" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">0.86</text>
+<rect x="291.5" y="486.4250946457545" width="22" height="433.5749053542455" rx="4" fill="#d97706" stroke="none"/>
+<text x="302.5" y="478.4250946457545" font-size="12" fill="#344054" font-weight="700" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">0.99</text>
+<rect x="319.5" y="516.2326869806094" width="22" height="403.7673130193906" rx="4" fill="#dc2626" stroke="none"/>
+<text x="330.5" y="508.2326869806094" font-size="12" fill="#344054" font-weight="700" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">0.92</text>
+<text x="502.5" y="962" font-size="17" fill="#172033" font-weight="700" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">GPS Server</text>
+<text x="502.5" y="990" font-size="14" fill="#667085" font-weight="500" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">fall 제외</text>
+<rect x="450.5" y="500.0729927007299" width="22" height="419.9270072992701" rx="4" fill="#2563eb" stroke="none"/>
+<text x="461.5" y="492.0729927007299" font-size="12" fill="#344054" font-weight="700" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">0.95</text>
+<rect x="478.5" y="507.82519280205656" width="22" height="412.17480719794344" rx="4" fill="#059669" stroke="none"/>
+<text x="489.5" y="499.82519280205656" font-size="12" fill="#344054" font-weight="700" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">0.94</text>
+<rect x="506.5" y="486.4250946457545" width="22" height="433.5749053542455" rx="4" fill="#d97706" stroke="none"/>
+<text x="517.5" y="478.4250946457545" font-size="12" fill="#344054" font-weight="700" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">0.99</text>
+<rect x="534.5" y="497.39588824459673" width="22" height="422.60411175540327" rx="4" fill="#dc2626" stroke="none"/>
+<text x="545.5" y="489.39588824459673" font-size="12" fill="#344054" font-weight="700" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">0.96</text>
+<text x="717.5" y="962" font-size="17" fill="#172033" font-weight="700" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">GPS Route</text>
+<text x="717.5" y="990" font-size="14" fill="#667085" font-weight="500" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">이동 경로</text>
+<rect x="665.5" y="485.3482260183968" width="22" height="434.6517739816032" rx="4" fill="#2563eb" stroke="none"/>
+<text x="676.5" y="477.3482260183968" font-size="12" fill="#344054" font-weight="700" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">0.99</text>
+<rect x="693.5" y="482.4017467248908" width="22" height="437.5982532751092" rx="4" fill="#059669" stroke="none"/>
+<text x="704.5" y="474.4017467248908" font-size="12" fill="#344054" font-weight="700" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">0.99</text>
+<rect x="721.5" y="486.4250946457545" width="22" height="433.5749053542455" rx="4" fill="#d97706" stroke="none"/>
+<text x="732.5" y="478.4250946457545" font-size="12" fill="#344054" font-weight="700" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">0.99</text>
+<rect x="749.5" y="484.4227112197772" width="22" height="435.5772887802228" rx="4" fill="#dc2626" stroke="none"/>
+<text x="760.5" y="476.4227112197772" font-size="12" fill="#344054" font-weight="700" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">0.99</text>
+<text x="932.5" y="962" font-size="17" fill="#172033" font-weight="700" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">IMU Fall</text>
+<text x="932.5" y="990" font-size="14" fill="#667085" font-weight="500" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">ICCAS+SisFall</text>
+<rect x="880.5" y="532.2026964202696" width="22" height="387.7973035797304" rx="4" fill="#2563eb" stroke="none"/>
+<text x="891.5" y="524.2026964202696" font-size="12" fill="#344054" font-weight="700" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">0.88</text>
+<rect x="908.5" y="529.3430656934306" width="22" height="390.6569343065694" rx="4" fill="#059669" stroke="none"/>
+<text x="919.5" y="521.3430656934306" font-size="12" fill="#344054" font-weight="700" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">0.89</text>
+<rect x="936.5" y="550.7422120008363" width="22" height="369.2577879991637" rx="4" fill="#d97706" stroke="none"/>
+<text x="947.5" y="542.7422120008363" font-size="12" fill="#344054" font-weight="700" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">0.84</text>
+<rect x="964.5" y="540.3439380911436" width="22" height="379.6560619088564" rx="4" fill="#dc2626" stroke="none"/>
+<text x="975.5" y="532.3439380911436" font-size="12" fill="#344054" font-weight="700" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">0.86</text>
+<text x="1147.5" y="962" font-size="17" fill="#172033" font-weight="700" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">GPS 5-class</text>
+<text x="1147.5" y="990" font-size="14" fill="#667085" font-weight="500" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">weighted F1</text>
+<rect x="1095.5" y="529.1533675953476" width="22" height="390.84663240465244" rx="4" fill="#2563eb" stroke="none"/>
+<text x="1106.5" y="521.1533675953476" font-size="12" fill="#344054" font-weight="700" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">0.89</text>
+<rect x="1123.5" y="527.0838207292128" width="22" height="392.9161792707872" rx="4" fill="#059669" stroke="none"/>
+<text x="1134.5" y="519.0838207292128" font-size="12" fill="#344054" font-weight="700" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">0.89</text>
+<rect x="1151.5" y="527.0838207292128" width="22" height="392.9161792707872" rx="4" fill="#d97706" stroke="none"/>
+<text x="1162.5" y="519.0838207292128" font-size="12" fill="#344054" font-weight="700" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">0.89</text>
+<rect x="1179.5" y="527.0838207292128" width="22" height="392.9161792707872" rx="4" fill="#dc2626" stroke="none"/>
+<text x="1190.5" y="519.0838207292128" font-size="12" fill="#344054" font-weight="700" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">0.89</text>
+<text x="1362.5" y="962" font-size="17" fill="#172033" font-weight="700" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">IMU 5-class</text>
+<text x="1362.5" y="990" font-size="14" fill="#667085" font-weight="500" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">weighted F1</text>
+<rect x="1310.5" y="582.9483364890452" width="22" height="337.0516635109548" rx="4" fill="#2563eb" stroke="none"/>
+<text x="1321.5" y="574.9483364890452" font-size="12" fill="#344054" font-weight="700" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">0.77</text>
+<rect x="1338.5" y="582.2813615731754" width="22" height="337.71863842682455" rx="4" fill="#059669" stroke="none"/>
+<text x="1349.5" y="574.2813615731754" font-size="12" fill="#344054" font-weight="700" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">0.77</text>
+<rect x="1366.5" y="582.2813615731754" width="22" height="337.71863842682455" rx="4" fill="#d97706" stroke="none"/>
+<text x="1377.5" y="574.2813615731754" font-size="12" fill="#344054" font-weight="700" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">0.77</text>
+<rect x="1394.5" y="582.2813615731754" width="22" height="337.71863842682455" rx="4" fill="#dc2626" stroke="none"/>
+<text x="1405.5" y="574.2813615731754" font-size="12" fill="#344054" font-weight="700" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">0.77</text>
+<rect x="70" y="1090" width="690" height="410" rx="8" fill="#ffffff" stroke="#d9dee8"/>
+<text x="100" y="1145" font-size="28" fill="#172033" font-weight="800" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">라벨 분포</text>
+<text x="110" y="1213" font-size="20" fill="#172033" font-weight="700" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">wandering</text>
+<rect x="260" y="1195" width="350" height="22" rx="11" fill="#eef2f7" stroke="none"/>
+<rect x="260" y="1195" width="174.62538874752616" height="22" rx="11" fill="#2563eb" stroke="none"/>
+<text x="635" y="1213" font-size="18" fill="#667085" font-weight="650" text-anchor="end" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">12,353</text>
+<text x="720" y="1213" font-size="18" fill="#667085" font-weight="650" text-anchor="end" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">49.9%</text>
+<text x="110" y="1271" font-size="20" fill="#172033" font-weight="700" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">walk</text>
+<rect x="260" y="1253" width="350" height="22" rx="11" fill="#eef2f7" stroke="none"/>
+<rect x="260" y="1253" width="113.13259824710207" height="22" rx="11" fill="#2563eb" stroke="none"/>
+<text x="635" y="1271" font-size="18" fill="#667085" font-weight="650" text-anchor="end" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">8,003</text>
+<text x="720" y="1271" font-size="18" fill="#667085" font-weight="650" text-anchor="end" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">32.3%</text>
+<text x="110" y="1329" font-size="20" fill="#172033" font-weight="700" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">fall</text>
+<rect x="260" y="1311" width="350" height="22" rx="11" fill="#eef2f7" stroke="none"/>
+<rect x="260" y="1311" width="38.888888888888886" height="22" rx="11" fill="#2563eb" stroke="none"/>
+<text x="635" y="1329" font-size="18" fill="#667085" font-weight="650" text-anchor="end" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">2,751</text>
+<text x="720" y="1329" font-size="18" fill="#667085" font-weight="650" text-anchor="end" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">11.1%</text>
+<text x="110" y="1387" font-size="20" fill="#172033" font-weight="700" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">idle</text>
+<rect x="260" y="1369" width="350" height="22" rx="11" fill="#eef2f7" stroke="none"/>
+<rect x="260" y="1369" width="14.15040995193667" height="22" rx="11" fill="#2563eb" stroke="none"/>
+<text x="635" y="1387" font-size="18" fill="#667085" font-weight="650" text-anchor="end" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">1,001</text>
+<text x="720" y="1387" font-size="18" fill="#667085" font-weight="650" text-anchor="end" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">4.0%</text>
+<text x="110" y="1445" font-size="20" fill="#172033" font-weight="700" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">sit</text>
+<rect x="260" y="1427" width="350" height="22" rx="11" fill="#eef2f7" stroke="none"/>
+<rect x="260" y="1427" width="9.202714164546226" height="22" rx="11" fill="#2563eb" stroke="none"/>
+<text x="635" y="1445" font-size="18" fill="#667085" font-weight="650" text-anchor="end" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">651</text>
+<text x="720" y="1445" font-size="18" fill="#667085" font-weight="650" text-anchor="end" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">2.6%</text>
+<rect x="800" y="1090" width="730" height="410" rx="8" fill="#ffffff" stroke="#d9dee8"/>
+<text x="830" y="1145" font-size="28" fill="#172033" font-weight="800" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">핵심 Confusion Matrix</text>
+<text x="840" y="1170" font-size="22" fill="#172033" font-weight="800" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">GPS Server</text>
+<rect x="840" y="1190" width="125" height="85" rx="8" fill="#dcfce7" stroke="none"/>
+<text x="858" y="1220" font-size="18" fill="#166534" font-weight="700" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">TP</text>
+<text x="858" y="1258" font-size="30" fill="#166534" font-weight="800" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">1,822</text>
+<rect x="985" y="1190" width="125" height="85" rx="8" fill="#fff7ed" stroke="none"/>
+<text x="1003" y="1220" font-size="18" fill="#9a3412" font-weight="700" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">FP</text>
+<text x="1003" y="1258" font-size="30" fill="#9a3412" font-weight="800" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">123</text>
+<rect x="840" y="1295" width="125" height="85" rx="8" fill="#fff7ed" stroke="none"/>
+<text x="858" y="1325" font-size="18" fill="#9a3412" font-weight="700" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">FN</text>
+<text x="858" y="1363" font-size="30" fill="#9a3412" font-weight="800" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">27</text>
+<rect x="985" y="1295" width="125" height="85" rx="8" fill="#dcfce7" stroke="none"/>
+<text x="1003" y="1325" font-size="18" fill="#166534" font-weight="700" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">TN</text>
+<text x="1003" y="1363" font-size="30" fill="#166534" font-weight="800" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">1,316</text>
+<text x="1180" y="1170" font-size="22" fill="#172033" font-weight="800" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">IMU Fall</text>
+<rect x="1180" y="1190" width="125" height="85" rx="8" fill="#dcfce7" stroke="none"/>
+<text x="1198" y="1220" font-size="18" fill="#166534" font-weight="700" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">TP</text>
+<text x="1198" y="1258" font-size="30" fill="#166534" font-weight="800" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">4,014</text>
+<rect x="1325" y="1190" width="125" height="85" rx="8" fill="#fff7ed" stroke="none"/>
+<text x="1343" y="1220" font-size="18" fill="#9a3412" font-weight="700" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">FP</text>
+<text x="1343" y="1258" font-size="30" fill="#9a3412" font-weight="800" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">507</text>
+<rect x="1180" y="1295" width="125" height="85" rx="8" fill="#fff7ed" stroke="none"/>
+<text x="1198" y="1325" font-size="18" fill="#9a3412" font-weight="700" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">FN</text>
+<text x="1198" y="1363" font-size="30" fill="#9a3412" font-weight="800" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">769</text>
+<rect x="1325" y="1295" width="125" height="85" rx="8" fill="#dcfce7" stroke="none"/>
+<text x="1343" y="1325" font-size="18" fill="#166534" font-weight="700" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">TN</text>
+<text x="1343" y="1363" font-size="30" fill="#166534" font-weight="800" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">5,465</text>
+<rect x="70" y="1540" width="1460" height="360" rx="8" fill="#ffffff" stroke="#d9dee8"/>
+<text x="100" y="1595" font-size="28" fill="#172033" font-weight="800" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">서버 적용 구조</text>
+<rect x="110" y="1640" width="420" height="185" rx="8" fill="#eef2f7" stroke="none"/>
+<text x="134" y="1688" font-size="25" fill="#172033" font-weight="800" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">GPS Server</text>
+<text x="134" y="1735" font-size="18" fill="#2563eb" font-weight="700" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">iccas_final_lstm_gps_wandering.pt</text>
+<text x="134" y="1782" font-size="18" fill="#667085" font-weight="500" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">배회 감지 전용</text>
+<text x="550" y="1740" font-size="42" fill="#98a2b3" font-weight="700" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">→</text>
+<rect x="580" y="1640" width="420" height="185" rx="8" fill="#eef2f7" stroke="none"/>
+<text x="604" y="1688" font-size="25" fill="#172033" font-weight="800" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">IMU Server</text>
+<text x="604" y="1735" font-size="18" fill="#2563eb" font-weight="700" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">iccas_final_sisfall_lstm_imu_fall.pt</text>
+<text x="604" y="1782" font-size="18" fill="#667085" font-weight="500" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">낙상 감지 전용</text>
+<text x="1020" y="1740" font-size="42" fill="#98a2b3" font-weight="700" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">→</text>
+<rect x="1050" y="1640" width="420" height="185" rx="8" fill="#eef2f7" stroke="none"/>
+<text x="1074" y="1688" font-size="25" fill="#172033" font-weight="800" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">Result Merge</text>
+<text x="1074" y="1735" font-size="18" fill="#2563eb" font-weight="700" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">fall 우선순위 적용</text>
+<text x="1074" y="1782" font-size="18" fill="#667085" font-weight="500" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">낙상 구간의 GPS 배회 알림은 낮은 우선순위</text>
+<text x="70" y="2030" font-size="18" fill="#667085" font-weight="500" text-anchor="start" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif">Generated from ai-model-release/metrics.json</text>
+</svg>

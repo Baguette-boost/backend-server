@@ -1,0 +1,195 @@
+{
+  "model": {
+    "name": "iccas_sensor_lstm_fall",
+    "created_at": "2026-07-01T21:46:15",
+    "sequence_length": 8,
+    "feature_count": 18,
+    "threshold": 11.092272758483887,
+    "threshold_quantile": 0.98,
+    "route_threshold_m": 30.0
+  },
+  "training_data": {
+    "source": "ICCAS_total_data_with_fall.xlsx",
+    "rows": 2703,
+    "normal_labels": "walk",
+    "validation_error_mean": 2.372262954711914,
+    "validation_error_std": 2.9276890754699707,
+    "test_error_mean": 4.917651176452637
+  },
+  "synthetic_event_evaluation": {
+    "source": "ICCAS_total_data_with_fall.xlsx",
+    "note": "Synthetic validation uses normal baseline rows and deterministic GPS-offset/IMU-impact events.",
+    "overall_accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0,
+    "confusion_matrix": {
+      "tp": 87,
+      "fp": 0,
+      "tn": 7926,
+      "fn": 0
+    },
+    "sets": {
+      "normal": {
+        "points": 2671,
+        "accuracy": 1.0,
+        "tp": 0,
+        "fp": 0,
+        "tn": 2671,
+        "fn": 0
+      },
+      "wandering": {
+        "points": 2671,
+        "accuracy": 1.0,
+        "tp": 81,
+        "fp": 0,
+        "tn": 2590,
+        "fn": 0
+      },
+      "fall": {
+        "points": 2671,
+        "accuracy": 1.0,
+        "tp": 6,
+        "fp": 0,
+        "tn": 2665,
+        "fn": 0
+      }
+    }
+  },
+  "replay_smoke_test": {
+    "source": "ICCAS_total_data_with_fall.xlsx",
+    "points": 2871,
+    "ready_points": 2791,
+    "alarm_points": 46,
+    "wandering_points": 0,
+    "fall_points": 30,
+    "backend_url": ""
+  },
+  "sisfall_merged_imu_fall_lstm": {
+    "model": "models/iccas_sisfall_lstm_imu_fall.pt",
+    "metadata": "models/iccas_sisfall_lstm_imu_fall.json",
+        "source": "data/iccas_sensor_lstm/final_iccas_sisfall_imu_merged.csv",
+    "task": "imu_fall",
+    "positive_label": "fall",
+    "sequence_length": 32,
+        "threshold": 0.61,
+    "architecture": "bidirectional LSTM with attention pooling",
+    "device": "mps",
+    "split_method": "SisFall source-file split; ICCAS chronological scenario split",
+    "split_sizes": {
+            "train": 61408,
+            "validation": 12269,
+            "test": 10755
+    },
+    "test_metrics": {
+            "accuracy": 0.8813575081357509,
+            "precision": 0.8878566688785667,
+            "recall": 0.8392222454526448,
+            "f1": 0.8628546861564917,
+            "tp": 4014,
+            "fp": 507,
+            "tn": 5465,
+            "fn": 769
+    },
+    "test_metrics_by_dataset": {
+      "ICCAS": {
+                "accuracy": 0.9665948275862069,
+                "precision": 0.9285714285714286,
+                "recall": 0.7572815533980582,
+                "f1": 0.8342245989304814,
+                "tp": 78,
+                "fp": 6,
+                "tn": 819,
+                "fn": 25
+      },
+      "SisFall": {
+                "accuracy": 0.8733082324208813,
+                "precision": 0.8870858688302907,
+                "recall": 0.841025641025641,
+                "f1": 0.8634419216847647,
+                "tp": 3936,
+                "fp": 501,
+                "tn": 4646,
+                "fn": 744
+      }
+    }
+  },
+  "iccas_final_data": {
+    "source": "ICCAS_final_data.xlsx",
+    "device": "mps",
+    "rows": 24759,
+    "labels": {
+      "walk": 8003,
+      "wandering": 12353,
+      "fall": 2751,
+      "sit": 651,
+      "idle": 1001
+    },
+    "recommended_models": {
+      "gps_wandering": "models/iccas_final_lstm_gps_wandering.pt",
+      "imu_fall": "models/iccas_final_sisfall_lstm_imu_fall.pt"
+    },
+    "parallel_5class": {
+      "gps": {
+        "model": "models/iccas_final_lstm_gps.pt",
+        "accuracy": 0.8882878009196646,
+        "macro_f1": 0.6757547929371126,
+        "weighted_f1": 0.8929913165245164
+      },
+      "imu_gyro": {
+        "model": "models/iccas_final_lstm_imu_gyro.pt",
+        "accuracy": 0.7660265079794428,
+        "macro_f1": 0.6178546529996707,
+        "weighted_f1": 0.7675423600609649
+      }
+    },
+    "binary_models": {
+      "gps_wandering": {
+        "model": "models/iccas_final_lstm_gps_wandering.pt",
+        "accuracy": 0.9115499053286449,
+        "precision": 0.8586239396795476,
+        "recall": 0.9853975121687398,
+        "f1": 0.9176529841349786,
+        "threshold": 0.08,
+        "server_task_metrics": {
+          "fall_sheets_excluded": {
+            "accuracy": 0.9543795620437956,
+            "precision": 0.9367609254498714,
+            "recall": 0.9853975121687398,
+            "f1": 0.9604638903531892,
+            "tp": 1822,
+            "fp": 123,
+            "tn": 1316,
+            "fn": 27
+          },
+          "moving_route_only": {
+            "accuracy": 0.9878449408672799,
+            "precision": 0.9945414847161572,
+            "recall": 0.9853975121687398,
+            "f1": 0.9899483835914153,
+            "tp": 1822,
+            "fp": 10,
+            "tn": 1185,
+            "fn": 27
+          }
+        }
+      },
+      "imu_fall_iccas_only": {
+        "model": "models/iccas_final_lstm_imu_fall.pt",
+        "accuracy": 0.9621314579388693,
+        "precision": 0.8149882903981265,
+        "recall": 0.8508557457212714,
+        "f1": 0.832535885167464,
+        "threshold": 0.82
+      },
+      "imu_fall_iccas_sisfall": {
+        "model": "models/iccas_final_sisfall_lstm_imu_fall.pt",
+        "accuracy": 0.8813575081357509,
+        "precision": 0.8878566688785667,
+        "recall": 0.8392222454526448,
+        "f1": 0.8628546861564917,
+        "threshold": 0.61
+      }
+    }
+  }
+}

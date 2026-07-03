@@ -15,6 +15,7 @@ from backend.models.person import TrackedPerson
 from backend.schemas.ai import AIPredictRequest
 from backend.services.ai_client import ai_client
 from backend.database import get_independent_session
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -164,3 +165,42 @@ class NotificationService:
         except Exception as e:
             logger.error(f"Unexpected error during Expo push: {e}")
             raise e
+
+
+async def send_emergency_push(expo_token: str, elder_name: str, alert_type: str):
+    """ Expo Push API를 비동기(논블로킹)로 호출하여 실기기 알림을 전송하는 함수 """
+    if not expo_token or not expo_token.startswith("ExponentPushToken["):
+        logger.error(f"잘못된 Expo 토큰 형식입니다: {expo_token}")
+        return
+
+    expo_push_url = "https://exp.host/--/api/v2/push/send" # expo push service의 rest api 엔드포인트
+    
+    # 알림 타입에 따른 메시지 분기
+    if alert_type == "fall_detected":
+        body_msg = "낙상이 감지되었습니다. 즉시 확인해주세요!"
+    else:
+        body_msg = "설정된 안심 구역을 이탈하셨습니다."
+
+    payload = {
+        "to": expo_token,
+        "sound": "default",
+        "title": f"🚨 긴급 알림: {elder_name} 어르신",
+        "body": body_msg,
+        "priority": "high",
+        "data": {"screen": "EmergencyMap", "alert_type": alert_type}
+    }
+
+    # 비동기 HTTP 클라이언트를 사용하여 메인 스레드 블로킹 방지
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(expo_push_url, json=payload, timeout=5.0)
+            result = response.json()
+            
+            # Expo 서버 자체는 200 OK를 주더라도, 내부 데이터에 에러가 있을 수 있음
+            if "data" in result and result["data"].get("status") == "error":
+                logger.error(f"Expo 푸시 발송 에러 (토큰 만료 등): {result['data'].get('details')}")
+            else:
+                logger.info(f"[{elder_name}] 푸시 발송 성공!")
+                
+        except httpx.RequestError as e:
+            logger.error(f"Expo API 네트워크 통신 에러: {str(e)}")

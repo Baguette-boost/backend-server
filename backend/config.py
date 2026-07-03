@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     MYSQL_USER: str
     MYSQL_PASSWORD: str
     TZ: str
+    MY_EXPO_TOKEN: str
 
     model_config = SettingsConfigDict(
         env_file = ".env",

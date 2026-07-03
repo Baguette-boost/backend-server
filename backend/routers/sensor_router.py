@@ -2,7 +2,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
-# from backend.services.notification_service import send_emergency_push # TODO: send_emergency_push 구현
+from backend.services.notification_service import send_emergency_push
 from backend.database import get_db
 from backend.models.telemetry import GpsLog
 from backend.models.person import TrackedPerson
@@ -49,11 +49,12 @@ async def receive_sensor_result(
             await db.execute(stmt)
             await db.commit()
         else:
-            # 기존 데이터가 없다면 추가
+            # 기존 데이터가 없다면 추가(임시)
             new_gps = GpsLog(
                 person_id=int(result.person_id),
                 latitude=result.lat,
                 longitude=result.lng,
+                battery=-1,
                 is_fall_detected=result.fall_detected,
                 is_wandering_detected=result.wandering_detected
             )
@@ -90,7 +91,7 @@ async def receive_sensor_result(
             print(f"🚨 [긴급] {alert_type} 감지됨! 보호자 푸시 발송 대기열 추가.")
             
             # API 지연을 막기 위해 백그라운드 태스크로 푸시 전송 위임
-            # background_tasks.add_task(send_emergency_push, expo_token, elder_name, alert_type)
+            background_tasks.add_task(send_emergency_push, expo_token, elder_name, alert_type)
 
         return {"status": "success", "message": "Sensor data received successfully"}
         

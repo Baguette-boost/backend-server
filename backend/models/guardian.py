@@ -1,4 +1,4 @@
-from sqlalchemy import String, DateTime, func, text
+from sqlalchemy import String, DateTime, func, text, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import List
 

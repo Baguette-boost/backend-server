@@ -1,4 +1,4 @@
-from sqlalchemy import String, ForeignKey, Boolean, Text, DateTime, func, BigInteger
+from sqlalchemy import String, ForeignKey, Boolean, Text, DateTime, func, BigInteger, Integer, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from typing import TYPE_CHECKING

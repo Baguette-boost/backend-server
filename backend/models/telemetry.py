@@ -13,7 +13,7 @@ class GpsLog(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     person_id: Mapped[int] = mapped_column(
-        ForeignKey("tracked_persons.id", ondelete="CASCADE"), Integer, nullable=False
+        ForeignKey("tracked_persons.id", ondelete="CASCADE"), nullable=False
     )
     # 위경도 데이터: 소수점 6자리까지 저장 (약 0.11m 오차 범위)
     latitude: Mapped[float] = mapped_column(DECIMAL(8, 6), nullable=False)

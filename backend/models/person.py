@@ -17,7 +17,7 @@ class TrackedPerson(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     guardian_id: Mapped[int] = mapped_column(
-        ForeignKey("guardians.id", ondelete="CASCADE"), Integer, nullable=False, index=True
+        ForeignKey("guardians.id", ondelete="CASCADE"), nullable=False, index=True
     )
     name: Mapped[str] = mapped_column(String(50), nullable=False)
     age: Mapped[int] = mapped_column(Integer, nullable=False)

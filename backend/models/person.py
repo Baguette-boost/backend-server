@@ -1,4 +1,4 @@
-from sqlalchemy import String, ForeignKey, Integer, Text, Boolean, DECIMAL, DateTime, func
+from sqlalchemy import String, ForeignKey, Integer, Text, Boolean, DECIMAL, DateTime, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import List, TYPE_CHECKING
 
@@ -15,22 +15,22 @@ if TYPE_CHECKING:
 class TrackedPerson(Base, TimestampMixin):
     __tablename__ = "tracked_persons"
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     guardian_id: Mapped[int] = mapped_column(
-        ForeignKey("guardians.id", ondelete="CASCADE"), index=True
+        ForeignKey("guardians.id", ondelete="CASCADE"), Integer, nullable=False, index=True
     )
-    name: Mapped[str] = mapped_column(String(50))
-    age: Mapped[int] = mapped_column(Integer)
-    device_id: Mapped[str] = mapped_column(String(100))
-    device_token: Mapped[str] = mapped_column(Text)
-    current_battery: Mapped[int] = mapped_column(Integer)
-    is_active: Mapped[bool] = mapped_column(Boolean)
-    base_lat: Mapped[float] = mapped_column(DECIMAL(8, 6))
-    base_lng: Mapped[float] = mapped_column(DECIMAL(9, 6))
-    safe_radius: Mapped[int] = mapped_column(Integer)
-    is_escaped: Mapped[bool] = mapped_column(Boolean)
+    name: Mapped[str] = mapped_column(String(50), nullable=False)
+    age: Mapped[int] = mapped_column(Integer, nullable=False)
+    device_id: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    device_token: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    current_battery: Mapped[int] = mapped_column(Integer, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    base_lat: Mapped[float] = mapped_column(DECIMAL(8, 6), nullable=False)
+    base_lng: Mapped[float] = mapped_column(DECIMAL(9, 6), nullable=False)
+    safe_radius: Mapped[int] = mapped_column(Integer, nullable=False)
+    is_escaped: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"), default=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now(), index=True
+        DateTime, server_default=func.now()
     )
 
     # Relationships

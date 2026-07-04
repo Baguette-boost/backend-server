@@ -94,7 +94,7 @@ async def receive_gps(
     gps_dict['timestamp'] = gps_dict['timestamp'].isoformat()
 
     stmt = select(TrackedPerson).where(
-        TrackedPerson.id == gps_dict['person_id']
+        TrackedPerson.id == request.personId
     )
     
     person = (await db.execute(stmt)).scalar_one_or_none()

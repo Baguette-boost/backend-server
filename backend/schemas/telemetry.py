@@ -1,12 +1,13 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
+from decimal import Decimal
 
 # --- 1. GPS 관련 스키마 ---
 class GPSPoint(BaseModel):
     timestamp: datetime
-    latitude: float
-    longitude: float
+    latitude: Decimal
+    longitude: Decimal
 
 class GPSData(GPSPoint):
     battery: int = Field(Default=-1)

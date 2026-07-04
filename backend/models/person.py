@@ -28,6 +28,7 @@ class TrackedPerson(Base, TimestampMixin):
     base_lat: Mapped[float] = mapped_column(DECIMAL(8, 6))
     base_lng: Mapped[float] = mapped_column(DECIMAL(9, 6))
     safe_radius: Mapped[int] = mapped_column(Integer)
+    is_escaped: Mapped[bool] = mapped_column(Boolean)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), index=True
     )

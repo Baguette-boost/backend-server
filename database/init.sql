@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS tracked_persons (
     base_lat DECIMAL(8, 6) NOT NULL,
     base_lng DECIMAL(9, 6) NOT NULL,
     safe_radius INT NOT NULL,
+    is_escaped BOOLEAN DEFAULT false NOT NULL,
     guardian_id INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

@@ -32,7 +32,6 @@ class DeviceVerifyRequest(BaseModel):
     person_id: int
 
 class ZoneData(BaseModel):
-    id: int
     latitude: Decimal
     longitude: Decimal
     safe_radius: int

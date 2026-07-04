@@ -7,6 +7,7 @@ from sqlalchemy import select
 
 from backend.database import get_db
 from backend.models.guardian import Guardian
+from backend.schemas.guardian import TokenResponse
 
 import os
 from dotenv import load_dotenv
@@ -81,3 +82,15 @@ async def verify_device_token(authorization: str = Header(...)):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unregistered Device")
         
     return {"device_id": "HW-DEV-001", "person_id": 1}
+
+async def verify_refresh_token(refresh_token: str = Header(...)):
+    # TODO: verify 로직
+    
+    user_id = refresh_token.split("_")[0]
+
+    return user_id
+
+async def create_jwt_tokens(id: int):
+    # TODO: 토큰 생성
+
+    return TokenResponse(access_token=str(id)+"_ACCESS", refresh_token=str(id)+"_REFRESH", token_type="Bearer")

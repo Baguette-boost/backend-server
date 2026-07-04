@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS guardians (
     name VARCHAR(50) NOT NULL,
     phone VARCHAR(20) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
+    access_token VARCHAR(255) NOT NULL,
+    refresh_token VARCHAR(255) NOT NULL,
     expo_token VARCHAR(255) DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -61,3 +63,13 @@ CREATE TABLE IF NOT EXISTS alert_logs (
 
 -- 환자별 최근 알림 조회를 위한 복합 인덱스
 CREATE INDEX idx_person_alert_time ON alert_logs(person_id, created_at DESC);
+
+-- 5. 알림 테이블
+CREATE TABLE IF NOT EXISTS user_settings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    push_enabled BOOLEAN DEFAULT true,
+    zone_exit_alert BOOLEAN DEFAULT true,
+    low_battery_alert BOOLEAN DEFAULT false,
+    FOREIGN KEY (user_id) REFERENCES guardians(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

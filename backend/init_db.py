@@ -16,6 +16,8 @@ async def init_master_user(db: AsyncSession):
             phone=master_phone,
             password="master1234!", # get_password_hash("master1234!"),
             name="마스터보호자",
+            access_token="",
+            refresh_token="",
             expo_token="PUSH_TOKEN"
         )
         db.add(new_master)

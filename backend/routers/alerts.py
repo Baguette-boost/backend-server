@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
-from backend.schemas.alert import AlertResponse
+from backend.schemas.alert import AlertResponse, UnreadCountResponse
 from backend.core.security import get_current_user
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-
+from sqlalchemy import select, update, func
+from typing import Annotated
 from backend.database import get_db
 from backend.models.person import TrackedPerson
 from backend.models.alert import AlertLog
@@ -41,3 +41,31 @@ async def get_alert_logs(
     logs = (await db.execute(stmt_logs)).scalars().all()
 
     return logs
+
+@alert_router.get("/unread-count", response_model=UnreadCountResponse)
+async def get_unread_alerts_count(current_user: Annotated[dict, Depends(get_current_user)], db: AsyncSession = Depends(get_db)):
+    # 보호자가 담당하는 모든 피보호자들의 미읽음 알림 총합 계산
+    query = (
+        select(func.count(AlertLog.id))
+        .join(TrackedPerson, AlertLog.person_id == TrackedPerson.id)
+        .where(TrackedPerson.guardian_id == current_user["id"], AlertLog.is_read == False)
+    )
+    result = await db.execute(query)
+    return {"unread_count": result.scalar_one() or 0}
+
+@alert_router.patch("/{id}/read", status_code=status.HTTP_200_OK)
+async def mark_alert_as_read(id: int, current_user: Annotated[dict, Depends(get_current_user)], db: AsyncSession = Depends(get_db)):
+    await db.execute(update(AlertLog).where(AlertLog.id == id).values(is_read=True))
+    await db.commit()
+    return {"message": f"Alert {id} marked as read"}
+
+@alert_router.post("/read-all", status_code=status.HTTP_200_OK)
+async def mark_all_alerts_as_read(current_user: Annotated[dict, Depends(get_current_user)], db: AsyncSession = Depends(get_db)):
+    # 보호자에 속한 모든 환자의 알림 일괄 읽음 처리
+    subquery = select(TrackedPerson.id).where(TrackedPerson.guardian_id == current_user["id"])
+    result = await db.execute(subquery)
+    person_ids = result.scalars().all()
+    
+    await db.execute(update(AlertLog).where(AlertLog.person_id.in_(person_ids)).values(is_read=True))
+    await db.commit()
+    return {"message": "All alerts marked as read"}

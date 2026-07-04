@@ -3,17 +3,19 @@ from typing import List
 from datetime import datetime
 import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, update
 import asyncio
 
 # 내부 모듈 임포트 (경로는 프로젝트 환경에 맞게 수정)
-from backend.schemas.person import PersonCreate, PersonResponse, LocationAbstractResponse, LocationResponse, LocationHistoryResponse
+from backend.schemas.person import PersonCreate, PersonResponse, LocationAbstractResponse, LocationResponse, LocationHistoryResponse, ZoneData, DeviceVerifyRequest
 from backend.core.security import get_current_user
 
 from backend.database import get_db, get_independent_session
 from backend.models.person import TrackedPerson
 from backend.models.telemetry import GpsLog
 from backend.models.guardian import Guardian
+
+from typing import Annotated
 
 person_router = APIRouter(prefix="/persons", tags=["Persons"])
 
@@ -78,7 +80,29 @@ async def get_persons(current_guardian: Guardian = Depends(get_current_user), db
     
     return rst
 
-@person_router.delete("/{person_id}")
+@person_router.get("/{id}", response_model=PersonResponse)
+async def get_person_detail(id: int, current_user: Annotated[dict, Depends(get_current_user)], db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(TrackedPerson).where(TrackedPerson.id == id, TrackedPerson.guardian_id == current_user["id"]))
+    person = result.scalar_one_or_none()
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+    return person
+
+@person_router.patch("/{id}", response_model=PersonResponse)
+async def update_person(
+    id: int, 
+    payload: PersonCreate, 
+    current_user: Annotated[dict, Depends(get_current_user)], 
+    db: AsyncSession = Depends(get_db)
+):
+    stmt = update(TrackedPerson).where(TrackedPerson.id == id, TrackedPerson.guardian_id == current_user["id"]).values(**payload.model_dump(exclude_unset=True))
+    await db.execute(stmt)
+    await db.commit()
+    
+    res = await db.execute(select(TrackedPerson).where(Person.id == id))
+    return res.scalar_one()
+
+@person_router.delete("/{person_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_person(
     person_id: int,
     current_guardian: Guardian = Depends(get_current_user),
@@ -102,7 +126,17 @@ async def delete_person(
     await db.commit()
     return None
 
-
+@person_router.post("/verify", status_code=status.HTTP_200_OK)
+async def verify_device(payload: DeviceVerifyRequest, db: AsyncSession = Depends(get_db)):
+    # 하드웨어 기기가 유효한 기기 토큰을 지녔는지 검증하고 환자와 연동
+    result = await db.execute(select(TrackedPerson).where(TrackedPerson.device_token == payload.device_token))
+    person = result.scalar_one_or_none()
+    if not person:
+        raise HTTPException(status_code=400, detail="Invalid Device Token")
+        
+    await db.execute(update(TrackedPerson).where(TrackedPerson.id == payload.person_id).values(device_token=payload.device_token))
+    await db.commit()
+    return {"status": "verified", "mapped_person_id": payload.person_id}
 
 @person_router.get("/{person_id}/location", response_model=LocationResponse)
 async def get_person_location(
@@ -167,3 +201,23 @@ async def get_person_location_history(
     ]
 
     return {"history": formatted_history}
+
+@person_router.get("/{zoneId}/zones", response_model=ZoneData)
+async def get_person_zones(zoneId: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(TrackedPerson.base_lat, TrackedPerson.base_lng, TrackedPerson.safe_radius).where(TrackedPerson.id == zoneId))
+    row = result.first()
+    if row:
+        return ZoneData(base_lat=row.base_lat, base_lng=row.base_lng, safe_radius=row.safe_radius)
+    else:
+        return None
+
+@person_router.patch("/{zoneId}/zones", response_model=ZoneData, tags=["Global Zones Management"])
+async def update_zone(zoneId: int, payload: ZoneData, db: AsyncSession = Depends(get_db)):
+    await db.execute(update(TrackedPerson.base_lat, TrackedPerson.base_lng, TrackedPerson.safe_radius).where(TrackedPerson.id == zoneId).values(**payload.model_dump(exclude_unset=True)))
+    await db.commit()
+    result = await db.execute(select(TrackedPerson.base_lat, TrackedPerson.base_lng, TrackedPerson.safe_radius).where(TrackedPerson.id == zoneId))
+    row = result.first()
+    if row:
+        return ZoneData(base_lat=row.base_lat, base_lng=row.base_lng, safe_radius=row.safe_radius)
+    else:
+        return None

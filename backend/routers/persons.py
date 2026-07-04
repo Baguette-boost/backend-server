@@ -44,19 +44,16 @@ async def register_person(
     """환자 등록 및 디바이스 페어링"""
     # device_id 발급
     new_device_id = str(uuid.uuid4())
-
-    # 1. 고유 deviceToken 발급 (uuid 등 활용)
-    new_device_token = str(uuid.uuid4())
         
     # 2. DB 저장 로직 (Guardian ID와 함께 저장)
     new_person = TrackedPerson(
-        guardian_id=current_guardian("id"),
+        guardian_id=current_guardian.id,
         name=payload.name,
         age=payload.age,
         device_id=new_device_id,
-        device_token=new_device_token,
+        device_token=payload.device_token,
         current_battery=payload.current_battery,
-        is_active=payload.is_active,
+        is_active=True,
         base_lat=payload.base_lat,
         base_lng=payload.base_lng,
         safe_radius=payload.safe_radius
@@ -71,7 +68,7 @@ async def register_person(
 async def get_persons(current_guardian: Guardian = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """보호자가 관리하는 환자 목록 조회"""
     stmt = select(TrackedPerson).where(
-        TrackedPerson.guardian_id == current_guardian('id')
+        TrackedPerson.guardian_id == current_guardian.id
     )
 
     rst = (await db.execute(stmt)).scalars().all()
@@ -90,7 +87,7 @@ async def get_person_location(
 ):
     """최신 위경도, 배터리, AI 최종 낙상 확정 여부 반환"""
     # 1. 소유권 검증 (중요)
-    await check_guardian_ownership(person_id, current_guardian("id"), db)
+    await check_guardian_ownership(person_id, current_guardian.id, db)
     
     # 2. 캐시(Redis) 또는 DB에서 최신 위치 데이터 조회
     stmt = select(GpsLog).where(
@@ -105,10 +102,8 @@ async def get_person_location(
     latest_location = {
         "latitude": latest_log.latitude,
         "longitude": latest_log.longitude,
-        "battery": latest_log.battery,
-        "is_fall_confirmed": latest_log.is_fall_detected, # AI 통신 결과값 반영
-        "is_wandering_confirmed": latest_log.is_wandering_detected,
-        "created_at": latest_log.created_at
+        "is_fall": latest_log.is_fall_detected, # AI 통신 결과값 반영
+        "is_wandering": latest_log.is_wandering_detected
     }
 
     return latest_location
@@ -123,16 +118,27 @@ async def get_person_location_history(
 ):
     """지도 경로선 표현용 GPS 시계열 히스토리 데이터 조회"""
     # 1. 소유권 검증
-    await check_guardian_ownership(person_id, current_guardian("id"), db)
+    await check_guardian_ownership(person_id, current_guardian.id, db)
     
     # 2. DB에서 기간 내 위치 로그 조회
-    stmt = select(GpsLog.latitude, GpsLog.longitude, GpsLog.created_at).where(
+    stmt = select(GpsLog.latitude, GpsLog.longitude).where(
         GpsLog.person_id == person_id,
         GpsLog.created_at >= from_time,
         GpsLog.created_at <= to_time
     )
 
     # 위치 데이터 리스트
-    history_data = (await db.execute(stmt)).scalars().all()
+    history_data = (await db.execute(stmt)).all()
 
-    return {"history": history_data}
+    if not history_data:
+        return {"history": {}}
+    
+    formatted_history = [
+        LocationAbstractResponse(
+            latitude=item[0],
+            longitude=item[1]
+        )
+        for item in history_data
+    ]
+
+    return {"history": formatted_history}

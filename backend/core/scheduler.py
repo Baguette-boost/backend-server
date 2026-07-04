@@ -14,7 +14,7 @@ from backend.models.alert import AlertLog
 from backend.services.notification_service import NotificationService, get_guardian_token_and_name, send_emergency_push
 import asyncio
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 scheduler = AsyncIOScheduler()
 

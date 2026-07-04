@@ -21,7 +21,7 @@ from backend.routers.telemetry import telemetry_router
 from backend.routers.sensor_router import ai_router
 
 import logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 @asynccontextmanager

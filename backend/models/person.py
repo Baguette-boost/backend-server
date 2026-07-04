@@ -29,6 +29,8 @@ class TrackedPerson(Base, TimestampMixin):
     base_lng: Mapped[float] = mapped_column(DECIMAL(9, 6), nullable=False)
     safe_radius: Mapped[int] = mapped_column(Integer, nullable=False)
     is_escaped: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"), default=False)
+    is_fall: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"), default=False)
+    is_wandering:Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"), default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now()
     )

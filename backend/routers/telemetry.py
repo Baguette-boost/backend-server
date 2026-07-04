@@ -20,6 +20,7 @@ from backend.services.notification_service import NotificationService, send_emer
 import math
 from backend.models.alert import AlertLog
 from backend.models.person import TrackedPerson
+from decimal import Decimal
 
 import os
 from dotenv import load_dotenv
@@ -32,6 +33,9 @@ telemetry_router = APIRouter(
     tags=["Telemetry"],
     dependencies=[Depends(verify_device_token)]
 )
+
+LAT_METER_PER_DEGREE = 111000.0
+LON_METER_PER_DEGREE = 88800.0
 
 def calculate_haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """
@@ -103,15 +107,39 @@ async def receive_gps(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="등록되지 않은 환자입니다")
     
     current_time = datetime.utcnow()
+    current_lat = gps_dict['latitude']
+    current_lng = gps_dict['longitude']
 
-    # 하버사인 공식을 이용한 거리 계산 및 이탈 판정
-    distance = calculate_haversine(
-        gps_dict['latitude'], gps_dict['longitude'],
-        person.base_lat, person.base_lng
-    )
+    # bounding box 1차 필터링
+    # 안전 반경(m)을 위도, 경도 단위로 환산하여 사각형 경계 생성
+    lat_delta = Decimal(Decimal(person.safe_radius) / Decimal(LAT_METER_PER_DEGREE))
+    lon_delta = Decimal(Decimal(person.safe_radius) / Decimal(LON_METER_PER_DEGREE))
 
-    # 안전구역 반경 넘었는지 확인
-    is_in_safe_zone = distance <= person.safe_radius
+    min_lat, max_lat = person.base_lat - lat_delta, person.base_lat + lat_delta
+    min_lng, max_lng = person.base_lng - lon_delta, person.base_lng + lon_delta
+
+    # 1차 검증: bounding box 내부에 들어오지 않는다면 무조건 하버사인 연산 없이 '안전 구역 외부'로 판단 가능
+    if not (min_lat <= current_lat <= max_lat and min_lng <= current_lng <= max_lng):
+        is_in_safe_zone = False
+        distance = person.safe_radius # 임의 지정 (하버사인 스킵)
+    else:
+        # 사각형 내부의 애매한 지역만 정밀 하버사인 공식 수행
+        distance = calculate_haversine(current_lat, current_lng, person.base_lat, person.base_lng)
+        is_in_safe_zone = distance <= person.safe_radius
+
+    # 재진입 로그 및 알림 폭탄 방지 로직
+    should_trigger_alert = False
+
+    if not is_in_safe_zone:
+        # 최초 이탈 시점에만 알림 트리거 활성화 (기존에 안전구역 내부에 있었던 상태)
+        if not getattr(person, 'is_escaped', False):
+            should_trigger_alert = True
+            person.is_escaped = True # 이탈 상태로 전환
+    else:
+        # 다시 안전구역 안으로 들어오면 이탈 플래그 해제 (재진입 성공)
+        if getattr(person, 'is_escaped', False):
+            person.is_escaped = False
+            # TODO: 보호자에게 '안전 구역 복귀' 알림 전송
 
     # 환자의 활성 상태 및 시간 업데이트    
     update_stmt = (
@@ -124,33 +152,33 @@ async def receive_gps(
 
     # 이탈 판정 시 긴급 알림 로깅 및 실시간 트리거
     if not is_in_safe_zone:
-        alert_msg = f"[긴급] {person.name} 어르신이 안전 구역을 {int(distance - person.safe_radius)}m 벗어났습니다",
+        alert_msg = f"[긴급] {person.name} 어르신이 안전 구역을 {int(distance - person.safe_radius)}m 벗어났습니다"
 
-        # DB에 알림 로그 적재
-        alert_log = AlertLog(
-            person_id=person.id,
-            alert_type="zone_exit",
-            message=alert_msg,
-            created_at=current_time
-        )
-        db.add(alert_log)
-        await db.commit()
-
-
-        # 보호자의 토큰 및 웹소켓 연동용 정보 조회
-        token_info = await get_guardian_token_and_name(person.id)
-        if token_info:
-            expo_token, guardian_id = token_info["expo_token"], token_info["guardian_id"]
-            
-            # (1) 웹소켓 대시보드 실시간 브로드캐스팅 가동
-            payload_data = {"id": alert_log.id, "type": "zone_exit", "message": alert_msg}
-            background_tasks.add_task(
-                NotificationService.broadcast_event,
-                db=db, guardian_id=guardian_id, event_type="alert",
-                person_id=str(person.id), payload_data=payload_data, payload=None
+        if should_trigger_alert:    
+            # DB에 알림 로그 적재
+            alert_log = AlertLog(
+                person_id=person.id,
+                alert_type="zone_exit",
+                message=alert_msg,
+                created_at=current_time
             )
-            # (2) 분리된 웹훅 구조의 send_emergency_push 백그라운드 호출
-            background_tasks.add_task(send_emergency_push, expo_token, person.name, "zone_exit")
+            db.add(alert_log)
+            await db.commit()
+
+            # 보호자의 토큰 및 웹소켓 연동용 정보 조회
+            token_info = await get_guardian_token_and_name(person.id)
+            if token_info:
+                expo_token, guardian_id = token_info["expo_token"], token_info["guardian_id"]
+                
+                # (1) 웹소켓 대시보드 실시간 브로드캐스팅 가동
+                payload_data = {"id": alert_log.id, "type": "zone_exit", "message": alert_msg}
+                background_tasks.add_task(
+                    NotificationService.broadcast_event,
+                    db=db, guardian_id=guardian_id, event_type="alert",
+                    person_id=str(person.id), payload_data=payload_data, payload=None
+                )
+                # (2) 분리된 웹훅 구조의 send_emergency_push 백그라운드 호출
+                background_tasks.add_task(send_emergency_push, expo_token, person.name, "zone_exit")
 
         return {"status": "false", "message": "zone_exit"}
     

@@ -20,13 +20,22 @@ from backend.routers.telemetry import telemetry_router
 
 from backend.routers.sensor_router import ai_router
 
+import logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 1. AI HTTP 클라이언트 시작
-    ai_client.start()
-    
-    # 2. 백그라운드 스케줄러 시작
+    # 1. 백그라운드 스케줄러 시작(AI 연결보다 먼저 가동 -> 의존성 분리)
+    logger.info("FastAPI Lifespan: 백그라운드 스케줄러를 시작합니다.")
     start_scheduler()
+    
+    # 2. AI HTTP 클라이언트 시작
+    try:
+        logger.info("FastAPI Lifespan: AI 클라이언트 연결을 시도합니다.")
+        await ai_client.start()
+    except Exception as e:
+        logger.error(f"AI 컨테이너 연결 실패 (스케줄러는 정상 가동 유지됨): {e}")    
     
     # 3. 마스터 보호자 계정 생성
     async with get_independent_session() as db:

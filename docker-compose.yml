@@ -29,6 +29,8 @@ services:
       dockerfile: backend/Dockerfile
     environment:
       - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1  # 로그가 버퍼링 없이 즉시 터미널에 출력되도록 강제 설정
+      - TZ=Asia/Seoul       # 컨테이너 타임존을 한국 시간으로 통일
     container_name: baguetteboost-backend
     restart: always
     env_file:

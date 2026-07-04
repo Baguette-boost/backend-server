@@ -186,10 +186,10 @@ class NotificationService:
             title, body = "🚨 안전 구역 이탈", "안전 구역 이탈이 감지되었습니다"
         elif alert_type == 'fall_detected':
             title, body = "🚨 위험 상황 발생", "낙상이 감지되었습니다"
-        # elif alert_type == 'low_battery':
-        #     title, body = "🚨 배터리 부족", "기기 배터리가 부족합니다"
-        # elif alert_type == 'offline':
-        #     title, body = "🚨 오프라인", "기기가 오프라인 상태입니다"
+        elif alert_type == 'low_battery':
+            title, body = "🚨 배터리 부족", "기기 배터리가 부족합니다"
+        elif alert_type == 'offline':
+            title, body = "🚨 오프라인", "기기가 오프라인 상태입니다"
 
         try:
             # Expo 푸시 메시지 객체 생성

@@ -3,7 +3,7 @@ from typing import List
 from datetime import datetime
 import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete
 import asyncio
 
 # 내부 모듈 임포트 (경로는 프로젝트 환경에 맞게 수정)
@@ -77,6 +77,31 @@ async def get_persons(current_guardian: Guardian = Depends(get_current_user), db
         raise HTTPException(status_code=404, detail="환자 데이터를 찾을 수 없습니다.")
     
     return rst
+
+@person_router.delete("/{person_id}")
+async def delete_person(
+    person_id: int,
+    current_guardian: Guardian = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """추적하는 대상을 삭제"""
+    # 1. 소유권 검증 (중요)
+    await check_guardian_ownership(person_id, current_guardian.id, db)
+    
+    stmt = select(TrackedPerson).where(
+        TrackedPerson.id == person_id
+    )
+    person = (await db.execute(stmt)).scalar_one_or_none()
+    if not person:
+        raise HTTPException(status_code=404, detail="환자를 찾을 수 없습니다")
+    
+    stmt = delete(TrackedPerson).where(
+        TrackedPerson.id == person_id
+    )
+    await db.execute(stmt)
+    await db.commit()
+    return None
+
 
 
 @person_router.get("/{person_id}/location", response_model=LocationResponse)

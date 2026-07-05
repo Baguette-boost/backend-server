@@ -4,11 +4,12 @@ from datetime import datetime
 import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, update
+from sqlalchemy.exc import IntegrityError
 import asyncio
 
 # 내부 모듈 임포트 (경로는 프로젝트 환경에 맞게 수정)
 from backend.schemas.person import PersonCreate, PersonResponse, LocationAbstractResponse, LocationResponse, LocationHistoryResponse, ZoneData, DeviceVerifyRequest
-from backend.core.security import get_current_user
+from backend.core.security import get_current_user, verify_device_by_token
 
 from backend.database import get_db, get_independent_session
 from backend.models.person import TrackedPerson
@@ -61,7 +62,15 @@ async def register_person(
         safe_radius=payload.safe_radius
     )
     db.add(new_person)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        # device_token unique 제약 위반 등 -> 409
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="이미 등록된 디바이스 토큰입니다."
+        )
     await db.refresh(new_person)
 
     return new_person
@@ -128,15 +137,9 @@ async def delete_person(
 
 @person_router.post("/verify", status_code=status.HTTP_200_OK)
 async def verify_device(payload: DeviceVerifyRequest, db: AsyncSession = Depends(get_db)):
-    # 하드웨어 기기가 유효한 기기 토큰을 지녔는지 검증하고 환자와 연동
-    result = await db.execute(select(TrackedPerson).where(TrackedPerson.device_token == payload.device_token))
-    person = result.scalar_one_or_none()
-    if not person:
-        raise HTTPException(status_code=400, detail="Invalid Device Token")
-        
-    await db.execute(update(TrackedPerson).where(TrackedPerson.id == payload.person_id).values(device_token=payload.device_token))
-    await db.commit()
-    return {"status": "verified", "mapped_person_id": payload.person_id}
+    # 하드웨어 기기가 유효한 기기 토큰을 지녔는지 검증(조회만, 부작용 없음)
+    person_id = await verify_device_by_token(payload.device_token, db)
+    return {"status": "verified", "mapped_person_id": person_id}
 
 @person_router.get("/{person_id}/location", response_model=LocationResponse)
 async def get_person_location(

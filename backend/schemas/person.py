@@ -4,7 +4,6 @@ from datetime import datetime
 from decimal import Decimal
 
 class PersonCreate(BaseModel):
-    guardian_id: int
     name: str = Field(..., description="환자 이름")
     age: int = Field(..., description="환자 연령")
     device_token: str = Field(..., description="페어링할 기기의 MAC 주소")
@@ -29,7 +28,6 @@ class PersonResponse(BaseModel):
 
 class DeviceVerifyRequest(BaseModel):
     device_token: str
-    person_id: int
 
 class ZoneData(BaseModel):
     latitude: Decimal

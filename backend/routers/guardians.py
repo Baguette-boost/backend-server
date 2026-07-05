@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 from backend.core.security import get_current_user
 from backend.models.guardian import Guardian
+from backend.models.setting import UserSettings
 from backend.schemas.guardian import UserUpdate, UserSettingsUpdate, UserSettingsResponse
 from backend.database import get_db
 from sqlalchemy import select, update
@@ -17,33 +18,33 @@ async def get_my_profile(current_guardian: Guardian = Depends(get_current_user))
 @guardian_router.patch("/me", response_model=UserUpdate)
 async def update_profile(
     payload: UserUpdate, 
-    current_user: Annotated[dict, Depends(get_current_user)],
+    current_user: Annotated[Guardian, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db)
 ):
-    stmt = update(Guardian).where(Guardian.id == current_user["id"]).values(**payload.model_dump(exclude_unset=True))
+    stmt = update(Guardian).where(Guardian.id == current_user.id).values(**payload.model_dump(exclude_unset=True))
     await db.execute(stmt)
     await db.commit()
     return payload
 
 @guardian_router.get("/me/settings", response_model=UserSettingsResponse)
-async def get_settings(current_user: Annotated[dict, Depends(get_current_user)], db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(UserSettings).where(UserSettings.user_id == current_user["id"]))
+async def get_settings(current_user: Annotated[Guardian, Depends(get_current_user)], db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(UserSettings).where(UserSettings.user_id == current_user.id))
     settings = result.scalar_one_or_none()
     return settings
 
 @guardian_router.patch("/me/settings", response_model=UserSettingsResponse)
 async def update_settings(
     payload: UserSettingsUpdate,
-    current_user: Annotated[dict, Depends(get_current_user)],
+    current_user: Annotated[Guardian, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db)
 ):
     stmt = (
         update(UserSettings)
-        .where(UserSettings.user_id == current_user["id"])
+        .where(UserSettings.user_id == current_user.id)
         .values(**payload.model_dump(exclude_unset=True))
     )
     await db.execute(stmt)
     await db.commit()
     
-    result = await db.execute(select(UserSettings).where(UserSettings.user_id == current_user["id"]))
+    result = await db.execute(select(UserSettings).where(UserSettings.user_id == current_user.id))
     return result.scalar_one()

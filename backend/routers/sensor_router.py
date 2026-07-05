@@ -9,7 +9,7 @@ from backend.models.person import TrackedPerson
 from backend.models.guardian import Guardian
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 ai_router = APIRouter()
 

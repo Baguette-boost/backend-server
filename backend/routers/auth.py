@@ -42,6 +42,7 @@ async def signup(payload: SignUpRequest, db: AsyncSession = Depends(get_db)):
         password=payload.password,
         phone=payload.phone,
         name=payload.name,
+        expo_token=payload.expo_token,
         access_token="",
         refresh_token=""
     )
@@ -83,20 +84,22 @@ async def login(login_data: LoginRequest, db: AsyncSession = Depends(get_db)):
     else:
         # 프로덕션 모드 (False): 실제 DB 비밀번호(해시)와 비교
         # 주의: db 적재 시 비밀번호를 해싱해서 넣지 않았다면 여기서 에러가 날 수 있음
-        if not (login_data.password == user.password):
+        if not (login_data.password == guardian.password):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Incorrect phone number or password",
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-    # JWT 발급
-    access_token_expires = timedelta(minutes=60 * 24) # 24시간 넉넉하게
-    access_token = create_access_token(
-        data={"sub": guardian.phone}, expires_delta=access_token_expires
-    )
+    # # JWT 발급
+    # access_token_expires = timedelta(minutes=60 * 24) # 24시간 넉넉하게
+    # access_token = create_access_token(
+    #     data={"sub": guardian.phone}, expires_delta=access_token_expires
+    # )
 
-    return TokenResponse(access_token=access_token)
+    return await create_jwt_tokens(guardian.id)
+
+    # return TokenResponse(access_token=access_token)
 
 @auth_router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(refresh_token: str, db: AsyncSession = Depends(get_db)):
@@ -106,11 +109,11 @@ async def refresh_token(refresh_token: str, db: AsyncSession = Depends(get_db)):
     return await create_jwt_tokens(user_id=user_id)
 
 @auth_router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-async def logout(current_user: Annotated[dict, Depends(get_current_user)]):
+async def logout(current_user: Annotated[Guardian, Depends(get_current_user)], db: AsyncSession = Depends(get_db)):
     # Redis 또는 DB내 Refresh Token 무효화 처리 진행 예정 단락
     stmt = (
         update(Guardian)
-        .where(Guardian.id == current_user["id"])
+        .where(Guardian.id == current_user.id)
         .values(refresh_token="")
     )
     await db.execute(stmt)
@@ -124,6 +127,6 @@ async def test_bypass_logic(current_guardian: Guardian = Depends(get_current_use
     """
     return {
         "message": "인증 샌드박스 통과 성공!",
-        "phone": current_user.phone,
-        "name": current_user.name
+        "phone": current_guardian.phone,
+        "name": current_guardian.name
     }

@@ -81,8 +81,8 @@ async def get_persons(current_guardian: Guardian = Depends(get_current_user), db
     return rst
 
 @person_router.get("/{id}", response_model=PersonResponse)
-async def get_person_detail(id: int, current_user: Annotated[dict, Depends(get_current_user)], db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(TrackedPerson).where(TrackedPerson.id == id, TrackedPerson.guardian_id == current_user["id"]))
+async def get_person_detail(id: int, current_user: Annotated[Guardian, Depends(get_current_user)], db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(TrackedPerson).where(TrackedPerson.id == id, TrackedPerson.guardian_id == current_user.id))
     person = result.scalar_one_or_none()
     if not person:
         raise HTTPException(status_code=404, detail="Person not found")
@@ -92,14 +92,14 @@ async def get_person_detail(id: int, current_user: Annotated[dict, Depends(get_c
 async def update_person(
     id: int, 
     payload: PersonCreate, 
-    current_user: Annotated[dict, Depends(get_current_user)], 
+    current_user: Annotated[Guardian, Depends(get_current_user)], 
     db: AsyncSession = Depends(get_db)
 ):
-    stmt = update(TrackedPerson).where(TrackedPerson.id == id, TrackedPerson.guardian_id == current_user["id"]).values(**payload.model_dump(exclude_unset=True))
+    stmt = update(TrackedPerson).where(TrackedPerson.id == id, TrackedPerson.guardian_id == current_user.id).values(**payload.model_dump(exclude_unset=True))
     await db.execute(stmt)
     await db.commit()
     
-    res = await db.execute(select(TrackedPerson).where(Person.id == id))
+    res = await db.execute(select(TrackedPerson).where(TrackedPerson.id == id))
     return res.scalar_one()
 
 @person_router.delete("/{person_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -190,7 +190,7 @@ async def get_person_location_history(
     history_data = (await db.execute(stmt)).all()
 
     if not history_data:
-        return {"history": {}}
+        return {"history": []}
     
     formatted_history = [
         LocationAbstractResponse(
@@ -207,17 +207,22 @@ async def get_person_zones(zoneId: int, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(TrackedPerson.base_lat, TrackedPerson.base_lng, TrackedPerson.safe_radius).where(TrackedPerson.id == zoneId))
     row = result.first()
     if row:
-        return ZoneData(base_lat=row.base_lat, base_lng=row.base_lng, safe_radius=row.safe_radius)
+        return ZoneData(latitude=row.base_lat, longitude=row.base_lng, safe_radius=row.safe_radius)
     else:
         return None
 
 @person_router.patch("/{zoneId}/zones", response_model=ZoneData, tags=["Global Zones Management"])
 async def update_zone(zoneId: int, payload: ZoneData, db: AsyncSession = Depends(get_db)):
-    await db.execute(update(TrackedPerson.base_lat, TrackedPerson.base_lng, TrackedPerson.safe_radius).where(TrackedPerson.id == zoneId).values(**payload.model_dump(exclude_unset=True)))
+    # ZoneData 필드(latitude/longitude)를 DB 컬럼(base_lat/base_lng)으로 매핑
+    values = payload.model_dump(exclude_unset=True)
+    column_map = {"latitude": "base_lat", "longitude": "base_lng", "safe_radius": "safe_radius"}
+    column_values = {column_map[k]: v for k, v in values.items() if k in column_map}
+
+    await db.execute(update(TrackedPerson).where(TrackedPerson.id == zoneId).values(**column_values))
     await db.commit()
     result = await db.execute(select(TrackedPerson.base_lat, TrackedPerson.base_lng, TrackedPerson.safe_radius).where(TrackedPerson.id == zoneId))
     row = result.first()
     if row:
-        return ZoneData(base_lat=row.base_lat, base_lng=row.base_lng, safe_radius=row.safe_radius)
+        return ZoneData(latitude=row.base_lat, longitude=row.base_lng, safe_radius=row.safe_radius)
     else:
         return None

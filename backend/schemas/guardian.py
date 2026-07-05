@@ -14,7 +14,7 @@ class SignUpRequest(LoginRequest):
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
-    token_type: str = "bearer"
+    token_type: str = "Bearer"
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None

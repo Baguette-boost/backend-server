@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Header, status
 
 from pydantic import BaseModel
 import jwt
@@ -9,7 +9,7 @@ from sqlalchemy import select, update
 
 from backend.database import get_db
 from backend.models.guardian import Guardian
-from backend.core.security import get_current_user, SECRET_KEY, ALGORITHM, DEBUG_MODE, create_jwt_tokens, verify_refresh_token # 해싱/검증 유틸
+from backend.core.security import get_current_user, SECRET_KEY, ALGORITHM, DEBUG_MODE, create_jwt_tokens, verify_refresh_token, get_password_hash, verify_password # 해싱/검증 유틸
 from backend.schemas.guardian import TokenResponse, SignUpRequest, LoginRequest
 
 from typing import Annotated
@@ -37,9 +37,11 @@ async def signup(payload: SignUpRequest, db: AsyncSession = Depends(get_db)):
             detail="이미 사용 중인 아이디입니다."
         )        
 
-    # 유저 생성 ORM 로직    
+    # 유저 생성 ORM 로직
+    # 디버그: 평문 저장 / 프로덕션: bcrypt 해시 저장
+    password_to_store = payload.password if DEBUG_MODE else get_password_hash(payload.password)
     new_guardian = Guardian(
-        password=payload.password,
+        password=password_to_store,
         phone=payload.phone,
         name=payload.name,
         expo_token=payload.expo_token,
@@ -78,35 +80,43 @@ async def login(login_data: LoginRequest, db: AsyncSession = Depends(get_db)):
     
     # 🚨 [DEBUG MODE] vs [PRODUCTION MODE] 분기 처리
     if DEBUG_MODE:
-        # 디버그 모드: 하드코딩된 패스워드 무조건 통과
-        if login_data.password != "master1234!": 
-            raise HTTPException(status_code=401, detail="Incorrect debug password")
+        # 디버그 모드: 평문 저장 -> 평문 비교
+        password_ok = (login_data.password == guardian.password)
     else:
-        # 프로덕션 모드 (False): 실제 DB 비밀번호(해시)와 비교
-        # 주의: db 적재 시 비밀번호를 해싱해서 넣지 않았다면 여기서 에러가 날 수 있음
-        if not (login_data.password == guardian.password):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect phone number or password",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+        # 프로덕션 모드: bcrypt 해시 비교
+        password_ok = verify_password(login_data.password, guardian.password)
+
+    if not password_ok:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect phone number or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     # # JWT 발급
     # access_token_expires = timedelta(minutes=60 * 24) # 24시간 넉넉하게
     # access_token = create_access_token(
     #     data={"sub": guardian.phone}, expires_delta=access_token_expires
     # )
+    result = await create_jwt_tokens(guardian.id)
+    stmt = (
+        update(Guardian)
+        .where(Guardian.id == guardian.id)
+        .values(access_token=result.access_token, refresh_token=result.refresh_token)
+    )
+    await db.execute(stmt)
+    await db.commit()
 
-    return await create_jwt_tokens(guardian.id)
+    return result
 
     # return TokenResponse(access_token=access_token)
 
 @auth_router.post("/refresh", response_model=TokenResponse)
-async def refresh_token(refresh_token: str, db: AsyncSession = Depends(get_db)):
-    user_id = await verify_refresh_token(refresh_token)
+async def refresh_token(refresh_token: str = Header(...), db: AsyncSession = Depends(get_db)):
+    user_id = await verify_refresh_token(refresh_token, db)
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
-    return await create_jwt_tokens(user_id=user_id)
+    return await create_jwt_tokens(id=user_id)
 
 @auth_router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(current_user: Annotated[Guardian, Depends(get_current_user)], db: AsyncSession = Depends(get_db)):
@@ -114,7 +124,7 @@ async def logout(current_user: Annotated[Guardian, Depends(get_current_user)], d
     stmt = (
         update(Guardian)
         .where(Guardian.id == current_user.id)
-        .values(refresh_token="")
+        .values(access_token="", refresh_token="")
     )
     await db.execute(stmt)
     await db.commit()

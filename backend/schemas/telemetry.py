@@ -10,7 +10,7 @@ class GPSPoint(BaseModel):
     longitude: Decimal
 
 class GPSData(GPSPoint):
-    battery: int = Field(Default=-1)
+    battery: int = Field(default=-1)
     is_fall_detected: bool = Field(default=False)
     is_wandering_detected: bool = Field(default=False)
 
@@ -32,9 +32,4 @@ class FallSuspectRequest(BaseModel):
     timestamp: datetime
     imuData: IMUData
 
-# --- 3. AI 컨테이너 전송용 스키마 ---
-class AIPredictRequest(BaseModel):
-    personId: int
-    timestamp: str
-    imuData: IMUData
-    gpsData: List[GPSPoint]
+# AI 컨테이너 전송용 스키마(AIPredictRequest)는 backend/schemas/ai.py로 일원화되었습니다.

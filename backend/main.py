@@ -6,12 +6,9 @@ import time
 from contextlib import asynccontextmanager
 from backend.core.scheduler import start_scheduler, stop_scheduler
 from backend.services.ai_client import ai_client
-from backend.core.security import get_current_user, verify_device_token
-from backend.database import get_independent_session
-from backend.init_db import init_master_user
+from backend.core.security import get_current_user
 
-from tests.e2e.simulator import sim_router
-from backend.routers.realtime import router 
+from backend.routers.realtime import router
 from backend.routers.auth import auth_router
 from backend.routers.alerts import alert_router
 from backend.routers.guardians import guardian_router
@@ -37,10 +34,6 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"AI 컨테이너 연결 실패 (스케줄러는 정상 가동 유지됨): {e}")    
     
-    # 3. 마스터 보호자 계정 생성
-    async with get_independent_session() as db:
-        await init_master_user(db)
-
     yield # 서버 실행 중
     
     # 4. 우아한 종료 (Graceful Shutdown)
@@ -48,9 +41,6 @@ async def lifespan(app: FastAPI):
     await ai_client.stop()
 
 app = FastAPI(lifespan=lifespan, title="Baguetteboost Backend", version="1.0.0")
-
-# 테스트용 라우터 등록
-app.include_router(sim_router)
 
 # 웹소켓 라우터 등록
 app.include_router(router)
@@ -81,12 +71,3 @@ gps_inmemory_buffers: Dict[int, deque] = {}
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "timestamp": time.time()}
-
-# 인증 테스트용 임시 라우터
-@app.get("/api/v1/guardian/me", dependencies=[Depends(get_current_user)])
-async def get_guardian_profile():
-    return {"message": "보호자 인증 성공"}
-
-@app.post("/api/v1/device/ping", dependencies=[Depends(verify_device_token)])
-async def device_ping():
-    return {"message": "디바이스 인증 성공"}

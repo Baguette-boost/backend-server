@@ -3,3 +3,6 @@
 
 # 가상환경
 .venv
+
+# pychache
+*__pycache__*

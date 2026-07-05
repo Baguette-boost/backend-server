@@ -27,9 +27,9 @@ COPY . .
 # 8000번 포트를 쓸 것임을 명시
 EXPOSE 8000
 
-# 컨테이너 헬스체크 설정 (FastAPI 서버가 정상 응답하는지 확인)
+# 컨테이너 헬스체크 설정 (인증 불필요한 /health 엔드포인트로 서버 생존만 확인)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:8000/me || exit 1
+    CMD curl -f http://localhost:8000/health || exit 1
 
 # 컨테이너 실행 명령어(FastAPI를 uvicorn으로 구동)
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--app-dir", "backend"]

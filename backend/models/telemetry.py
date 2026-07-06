@@ -1,7 +1,7 @@
 from sqlalchemy import ForeignKey, DECIMAL, Index, DateTime, func, Integer, Boolean, BigInteger, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from .base import Base
 
@@ -16,8 +16,9 @@ class GpsLog(Base):
         ForeignKey("tracked_persons.id", ondelete="CASCADE"), nullable=False
     )
     # 위경도 데이터: 소수점 6자리까지 저장 (약 0.11m 오차 범위)
-    latitude: Mapped[float] = mapped_column(DECIMAL(8, 6), nullable=False)
-    longitude: Mapped[float] = mapped_column(DECIMAL(9, 6), nullable=False)
+    # GPS 무효 구간에서는 AI가 lat/lng 을 보내지 않을 수 있어 nullable 로 둔다.
+    latitude: Mapped[Optional[float]] = mapped_column(DECIMAL(8, 6), nullable=True)
+    longitude: Mapped[Optional[float]] = mapped_column(DECIMAL(9, 6), nullable=True)
     battery: Mapped[int] = mapped_column(Integer, nullable=False)
     is_fall_detected: Mapped[bool] = mapped_column(Boolean, server_default=text("false"), default=False)
     is_wandering_detected: Mapped[bool] = mapped_column(Boolean, server_default=text("false"), default=False)

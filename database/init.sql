@@ -39,8 +39,8 @@ CREATE TABLE IF NOT EXISTS tracked_persons (
 CREATE TABLE IF NOT EXISTS gps_logs (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     person_id INT NOT NULL,
-    latitude DECIMAL(8, 6) NOT NULL,
-    longitude DECIMAL(9, 6) NOT NULL,
+    latitude DECIMAL(8, 6) NULL,
+    longitude DECIMAL(9, 6) NULL,
     battery INT NOT NULL,
     is_fall_detected BOOLEAN DEFAULT false,
     is_wandering_detected BOOLEAN DEFAULT false,

@@ -64,14 +64,25 @@ async def receive_sensor_result(
         person_pk = person.id
 
         # 1. DB 저장 로직 (최신 데이터 갱신 및 히스토리 저장)
-        stmt = select(GpsLog.id).where(
-            GpsLog.person_id == person_pk,
-            GpsLog.created_at == result.server_time
-        )
-        gps_id = (await db.execute(stmt)).scalar_one_or_none()
+        # server_time(문자열)을 파싱해 created_at 저장/매칭에 사용한다.
+        # created_at 은 초 단위 TIMESTAMP 이므로 마이크로초를 잘라 저장·비교 정밀도를 맞춘다.
+        event_time = None
+        if result.server_time:
+            try:
+                event_time = datetime.fromisoformat(result.server_time).replace(microsecond=0)
+            except ValueError:
+                event_time = None
+
+        gps_id = None
+        if event_time is not None:
+            stmt = select(GpsLog.id).where(
+                GpsLog.person_id == person_pk,
+                GpsLog.created_at == event_time
+            )
+            gps_id = (await db.execute(stmt)).scalar_one_or_none()
 
         if gps_id:
-            # 기존 gps 데이터가 있다면 업데이트
+            # 같은 시각의 데이터가 있다면 감지 플래그만 갱신
             stmt = update(GpsLog).where(
                 GpsLog.id == gps_id
             ).values(
@@ -81,7 +92,7 @@ async def receive_sensor_result(
             await db.execute(stmt)
             await db.commit()
         else:
-            # 기존 데이터가 없다면 추가(임시)
+            # 없으면 새 로그 추가 (event_time 이 있으면 created_at 으로 저장, 없으면 DB now())
             new_gps = GpsLog(
                 person_id=person_pk,
                 latitude=result.lat,
@@ -90,6 +101,8 @@ async def receive_sensor_result(
                 is_fall_detected=result.fall_detected,
                 is_wandering_detected=result.wandering_detected
             )
+            if event_time is not None:
+                new_gps.created_at = event_time
             db.add(new_gps)
             await db.commit()
             await db.refresh(new_gps)

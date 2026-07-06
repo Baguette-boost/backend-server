@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
 from datetime import datetime
 
@@ -31,4 +31,8 @@ class UserSettingsResponse(BaseModel):
     push_enabled: bool
     zone_exit_alert: bool
     low_battery_alert: bool
-    updated_at: datetime
+
+    model_config = ConfigDict(
+        populate_by_name = True,
+        from_attributes = True
+    )

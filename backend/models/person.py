@@ -9,7 +9,7 @@ from .base import Base, TimestampMixin
 # 순환 참조 방지를 위한 타입 힌팅 전용 임포트
 if TYPE_CHECKING:
     from .guardian import Guardian
-    from .telemetry import GpsLog
+    from .telemetry import GpsLog, ImuLog
     from .alert import AlertLog
 
 class TrackedPerson(Base, TimestampMixin):
@@ -38,6 +38,9 @@ class TrackedPerson(Base, TimestampMixin):
     # Relationships
     guardian: Mapped["Guardian"] = relationship(back_populates="tracked_persons")
     gps_logs: Mapped[List["GpsLog"]] = relationship(
+        back_populates="person", cascade="all, delete-orphan", lazy="selectin"
+    )
+    imu_logs: Mapped[List["ImuLog"]] = relationship(
         back_populates="person", cascade="all, delete-orphan", lazy="selectin"
     )
     alerts: Mapped[List["AlertLog"]] = relationship(

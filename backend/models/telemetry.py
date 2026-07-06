@@ -1,4 +1,4 @@
-from sqlalchemy import ForeignKey, DECIMAL, Index, DateTime, func, Integer, Boolean, BigInteger, text
+from sqlalchemy import ForeignKey, DECIMAL, Index, DateTime, func, Integer, Boolean, BigInteger, text, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
@@ -31,4 +31,29 @@ class GpsLog(Base):
     # 특정 피보호자의 시간대별 경로를 빠르게 조회하기 위한 복합 인덱스
     __table_args__ = (
         Index("idx_person_gps_time", "person_id", "created_at"),
+    )
+
+
+class ImuLog(Base):
+    __tablename__ = "imu_logs"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    person_id: Mapped[int] = mapped_column(
+        ForeignKey("tracked_persons.id", ondelete="CASCADE"), nullable=False
+    )
+    # 디바이스가 낙상 의심을 감지한 시각 (request.timestamp)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    # 낙상 의심 순간의 IMU 6축 윈도우 원본: {ax, ay, az, wx, wy, wz}
+    imu_data: Mapped[dict] = mapped_column(JSON, nullable=False)
+    sample_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # 사람이 검수한 실제 낙상 여부 (재학습용 지도 라벨)
+    true_label: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    # 서버 적재 시각 (recorded_at 과 분리 — 재전송·지연 대비)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    person: Mapped["TrackedPerson"] = relationship(back_populates="imu_logs")
+
+    # 특정 피보호자의 낙상 의심 이력을 시간순으로 조회하기 위한 복합 인덱스
+    __table_args__ = (
+        Index("idx_person_imu_time", "person_id", "recorded_at"),
     )

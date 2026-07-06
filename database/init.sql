@@ -73,3 +73,18 @@ CREATE TABLE IF NOT EXISTS user_settings (
     low_battery_alert BOOLEAN DEFAULT false,
     FOREIGN KEY (user_id) REFERENCES guardians(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 6. IMU 낙상 의심 로그 테이블 (모델 재학습용 원본 데이터)
+CREATE TABLE IF NOT EXISTS imu_logs (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    person_id INT NOT NULL,
+    recorded_at TIMESTAMP NOT NULL,
+    imu_data JSON NOT NULL,
+    sample_count INT NULL,
+    true_label BOOLEAN NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (person_id) REFERENCES tracked_persons(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 환자별 낙상 의심 이력을 시간순으로 조회하기 위한 복합 인덱스
+CREATE INDEX idx_person_imu_time ON imu_logs(person_id, recorded_at DESC);

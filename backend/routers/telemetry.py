@@ -208,26 +208,46 @@ async def receive_gps(
 
 @telemetry_router.post("/fall-suspect", status_code=status.HTTP_202_ACCEPTED) # POST /telemetry/fall-suspect
 async def receive_fall_suspect(
-    request: FallSuspectRequest, 
-    background_tasks: BackgroundTasks
+    request: FallSuspectRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db)
 ):
     """
     [디바이스 -> 서버] 디바이스 자체 판단 하에 낙상 의심 시점의 IMU 데이터 수신
     (Background) AI 컨테이너로 IMU 및 누적 GPS 데이터를 묶어서 전송
     """
-    imu_dict = request.imuData.dict()
-    gps_list = get_patient_gps_history(request.personId)
+    # 등록된 환자인지 검증 (미등록 personId의 낙상 데이터가 AI로 흘러가는 것을 차단)
+    person = (
+        await db.execute(
+            select(TrackedPerson).where(TrackedPerson.id == request.personId)
+        )
+    ).scalar_one_or_none()
 
-    # AI 서버 규약에 맞게 페이로드 구성
-    # datetime 객체를 그대로 전달한다. (문자열로 isoformat()+'Z' 하면 tz-aware 입력에서
-    #  '+00:00Z' 이중 표기가 되어 재파싱이 실패한다. 직렬화는 model_dump(mode='json')가 처리.)
-    payload = AIPredictRequest(
-        personId=request.personId,
-        timestamp=request.timestamp,
-        imuData=imu_dict,
-        gpsData=gps_list
-    )
-    
+    if not person:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="등록되지 않은 환자입니다")
+
+    try:
+        imu_dict = request.imuData.dict()
+        gps_list = get_patient_gps_history(request.personId)
+
+        # AI 서버 규약에 맞게 페이로드 구성
+        # datetime 객체를 그대로 전달한다. (문자열로 isoformat()+'Z' 하면 tz-aware 입력에서
+        #  '+00:00Z' 이중 표기가 되어 재파싱이 실패한다. 직렬화는 model_dump(mode='json')가 처리.)
+        payload = AIPredictRequest(
+            personId=request.personId,
+            timestamp=request.timestamp,
+            imuData=imu_dict,
+            gpsData=gps_list
+        )
+    except Exception as e:
+        # 버퍼에 손상된 GPS 데이터가 섞이는 등 payload 구성 단계에서 발생하는 예외를
+        # 트레이스백 노출 없이 로깅 후 500으로 반환한다.
+        logger.error(f"[fall-suspect] payload 구성 실패 personId={request.personId}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="낙상 의심 데이터 처리 중 오류가 발생했습니다"
+        )
+
     # 1. 디바이스에는 즉각적으로 202 Accepted 응답을 반환하기 위해 AI 통신을 백그라운드로 위임
     background_tasks.add_task(
         ai_client.predict,

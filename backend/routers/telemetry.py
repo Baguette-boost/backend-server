@@ -190,13 +190,12 @@ async def receive_gps(
     # 2. DB Insert는 백그라운드로 넘겨 API 응답 속도 최적화
     background_tasks.add_task(async_insert_gps_log, request.personId, gps_dict)
 
-    # AI 분석용 payload 구성
-    clean_timestamp = request.gps.timestamp.isoformat()
+    # AI 분석용 payload 구성 (datetime 객체를 그대로 전달)
     gps_list = get_patient_gps_history(request.personId)
-    
+
     payload = AIPredictRequest(
         personId=request.personId,
-        timestamp=clean_timestamp,
+        timestamp=request.gps.timestamp,
         imuData=None,
         gpsData=gps_list
     )
@@ -216,14 +215,15 @@ async def receive_fall_suspect(
     [디바이스 -> 서버] 디바이스 자체 판단 하에 낙상 의심 시점의 IMU 데이터 수신
     (Background) AI 컨테이너로 IMU 및 누적 GPS 데이터를 묶어서 전송
     """
-    timestamp_str = request.timestamp.isoformat() + 'Z'
     imu_dict = request.imuData.dict()
     gps_list = get_patient_gps_history(request.personId)
 
     # AI 서버 규약에 맞게 페이로드 구성
+    # datetime 객체를 그대로 전달한다. (문자열로 isoformat()+'Z' 하면 tz-aware 입력에서
+    #  '+00:00Z' 이중 표기가 되어 재파싱이 실패한다. 직렬화는 model_dump(mode='json')가 처리.)
     payload = AIPredictRequest(
         personId=request.personId,
-        timestamp=timestamp_str,
+        timestamp=request.timestamp,
         imuData=imu_dict,
         gpsData=gps_list
     )

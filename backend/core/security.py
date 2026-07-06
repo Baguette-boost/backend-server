@@ -1,5 +1,5 @@
 from fastapi import Depends, HTTPException, Header, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, APIKeyHeader
 import jwt
 
 from passlib.context import CryptContext
@@ -113,8 +113,17 @@ async def get_current_user(
     return guardian
 
 # 2. HW 디바이스 인증 의존성 (Authorization: Device <deviceToken>) — telemetry 라우터에서 사용
-async def verify_device_token(authorization: str = Header(...)):
-    if not authorization.startswith("Device "):
+# 일반 Header(...) 대신 APIKeyHeader 보안 스킴을 써야 Swagger Authorize에 입력칸이 노출되고
+# 요청에 Authorization 헤더가 실린다. auto_error=False로 미인증 시 아래에서 401을 직접 반환.
+device_token_scheme = APIKeyHeader(
+    name="Authorization",
+    scheme_name="DeviceToken",
+    auto_error=False,
+    description="형식: Device <device_token>",
+)
+
+async def verify_device_token(authorization: str | None = Depends(device_token_scheme)):
+    if not authorization or not authorization.startswith("Device "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authorization header format. Expected 'Device <token>'"

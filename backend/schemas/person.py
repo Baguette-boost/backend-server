@@ -12,6 +12,13 @@ class PersonCreate(BaseModel):
     base_lng: Decimal
     safe_radius: int
 
+class PersonUpdate(BaseModel):
+    name: Optional[str] = None
+    age: Optional[int] = None
+    base_lat: Optional[Decimal] = None
+    base_lng: Optional[Decimal] = None
+    safe_radius: Optional[int] = None
+
 class PersonResponse(BaseModel):
     id: int
     name: str

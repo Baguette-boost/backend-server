@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 import asyncio
 
 # 내부 모듈 임포트 (경로는 프로젝트 환경에 맞게 수정)
-from backend.schemas.person import PersonCreate, PersonResponse, LocationAbstractResponse, LocationResponse, LocationHistoryResponse, ZoneData, DeviceVerifyRequest
+from backend.schemas.person import PersonCreate, PersonUpdate, PersonResponse, LocationAbstractResponse, LocationResponse, LocationHistoryResponse, ZoneData, DeviceVerifyRequest
 from backend.core.security import get_current_user, verify_device_by_token
 
 from backend.database import get_db, get_independent_session
@@ -99,17 +99,25 @@ async def get_person_detail(id: int, current_user: Annotated[Guardian, Depends(g
 
 @person_router.patch("/{id}", response_model=PersonResponse)
 async def update_person(
-    id: int, 
-    payload: PersonCreate, 
-    current_user: Annotated[Guardian, Depends(get_current_user)], 
+    id: int,
+    payload: PersonUpdate,
+    current_user: Annotated[Guardian, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db)
 ):
-    stmt = update(TrackedPerson).where(TrackedPerson.id == id, TrackedPerson.guardian_id == current_user.id).values(**payload.model_dump(exclude_unset=True))
-    await db.execute(stmt)
+    values = payload.model_dump(exclude_unset=True)
+    if not values:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="수정할 필드가 없습니다.")
+
+    res = await db.execute(select(TrackedPerson).where(TrackedPerson.id == id, TrackedPerson.guardian_id == current_user.id))
+    person = res.scalar_one_or_none()
+    if not person:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Person not found")
+
+    for key, value in values.items():
+        setattr(person, key, value)
     await db.commit()
-    
-    res = await db.execute(select(TrackedPerson).where(TrackedPerson.id == id))
-    return res.scalar_one()
+    await db.refresh(person)
+    return person
 
 @person_router.delete("/{person_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_person(

@@ -9,6 +9,7 @@ from sqlalchemy import select, update
 
 from backend.database import get_db
 from backend.models.guardian import Guardian
+from backend.models.setting import UserSettings
 from backend.core.security import get_current_user, SECRET_KEY, ALGORITHM, DEBUG_MODE, create_jwt_tokens, verify_refresh_token, get_password_hash, verify_password # 해싱/검증 유틸
 from backend.schemas.guardian import TokenResponse, SignUpRequest, LoginRequest
 
@@ -51,6 +52,10 @@ async def signup(payload: SignUpRequest, db: AsyncSession = Depends(get_db)):
     db.add(new_guardian)
     await db.commit()
     await db.refresh(new_guardian)
+
+    # 기본 사용자 설정 행 생성
+    db.add(UserSettings(user_id=new_guardian.id))
+    await db.commit()
 
     # 토큰 발행
     tokens = await create_jwt_tokens(new_guardian.id)

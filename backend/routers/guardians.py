@@ -30,6 +30,11 @@ async def update_profile(
 async def get_settings(current_user: Annotated[Guardian, Depends(get_current_user)], db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(UserSettings).where(UserSettings.user_id == current_user.id))
     settings = result.scalar_one_or_none()
+    if settings is None:
+        settings = UserSettings(user_id=current_user.id)
+        db.add(settings)
+        await db.commit()
+        await db.refresh(settings)
     return settings
 
 @guardian_router.patch("/me/settings", response_model=UserSettingsResponse)
@@ -38,13 +43,15 @@ async def update_settings(
     current_user: Annotated[Guardian, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db)
 ):
-    stmt = (
-        update(UserSettings)
-        .where(UserSettings.user_id == current_user.id)
-        .values(**payload.model_dump(exclude_unset=True))
-    )
-    await db.execute(stmt)
-    await db.commit()
-    
     result = await db.execute(select(UserSettings).where(UserSettings.user_id == current_user.id))
-    return result.scalar_one()
+    settings = result.scalar_one_or_none()
+    if settings is None:
+        settings = UserSettings(user_id=current_user.id)
+        db.add(settings)
+
+    for key, value in payload.model_dump(exclude_unset=True).items():
+        setattr(settings, key, value)
+
+    await db.commit()
+    await db.refresh(settings)
+    return settings

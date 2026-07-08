@@ -8,6 +8,7 @@ services:
       - .env
     environment:
       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+    command: --default-time-zone="+00:00"
     ports:
       - "3306:3306"
     volumes:
@@ -30,7 +31,7 @@ services:
     environment:
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1  # 로그가 버퍼링 없이 즉시 터미널에 출력되도록 강제 설정
-      - TZ=Asia/Seoul       # 컨테이너 타임존을 한국 시간으로 통일
+      - TZ=UTC       # 컨테이너 타임존을 한국 시간으로 통일
     container_name: baguetteboost-backend
     restart: always
     env_file:
@@ -48,6 +49,8 @@ services:
     build:
       context: ./ai-model-release
       dockerfile: Dockerfile
+    environment:
+      - TZ=Asia/Seoul
     container_name: baguetteboost-ai
     restart: unless-stopped
     env_file:

@@ -18,8 +18,45 @@ from backend.routers.telemetry import telemetry_router
 from backend.routers.sensor_router import ai_router
 
 import logging
+import time
+from datetime import datetime
+import pytz
 # logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+
+
+
+# 로그의 시간대를 KST로 변환해주는 커스텀 포매터
+class KSTFormatter(logging.Formatter):
+    def converter(self, timestamp):
+        # 타임스탬프를 KST 시간으로 변환
+        dt = datetime.fromtimestamp(timestamp, tz=pytz.utc)
+        return dt.astimezone(pytz.timezone('Asia/Seoul')).timetuple()
+
+    def formatTime(self, record, datefmt=None):
+        ct = self.converter(record.created)
+        if datefmt:
+            s = time.strftime(datefmt, ct)
+        else:
+            t = time.strftime("%Y-%m-%d %H:%M:%S", ct)
+            s = f"{t}.{int(record.msecs):03d}"
+        return s
+
+# 2. 통합 로그 설정 (Uvicorn + App)
+def setup_logging():
+    log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    formatter = KSTFormatter(log_format)
+    handler = logging.StreamHandler()
+    handler.setFormatter(formatter)
+
+    # Uvicorn 및 root 로거 설정
+    for name in [None, "uvicorn", "uvicorn.access", "uvicorn.error"]:
+        logger = logging.getLogger(name)
+        logger.setLevel(logging.INFO)
+        logger.handlers = [handler]
+        logger.propagate = False
+
+setup_logging()
+logger = logging.getLogger("uvicorn") # 통합 로거 사용
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS alert_logs (
     person_id INT NOT NULL,
     alert_type VARCHAR(10) NOT NULL,
     message TEXT NOT NULL,
+    is_read BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (person_id) REFERENCES tracked_persons(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

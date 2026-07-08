@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List
 from backend.schemas.alert import AlertResponse, UnreadCountResponse
 from backend.core.security import get_current_user
@@ -15,7 +15,7 @@ alert_router = APIRouter(prefix="/alerts", tags=["Alerts"])
 
 @alert_router.get("", response_model=List[AlertResponse])
 async def get_alert_logs(
-    limit: int = 50,
+    limit: int = Query(default=50, ge=1, le=200, description="최대 조회 개수"),
     current_guardian: Guardian = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):

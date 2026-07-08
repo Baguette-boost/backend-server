@@ -1,4 +1,4 @@
-from sqlalchemy import String, ForeignKey, Boolean, Text, DateTime, func, BigInteger, Integer, Index
+from sqlalchemy import String, ForeignKey, Boolean, Text, DateTime, func, BigInteger, Integer, Index, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -17,6 +17,7 @@ class AlertLog(Base):
     )
     alert_type: Mapped[str] = mapped_column(String(10), nullable=False) # 예: 'FALL_DETECTED', 'GEOFENCE_EXIT'
     message: Mapped[str] = mapped_column(Text, nullable=False)
+    is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"), default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now()
     )

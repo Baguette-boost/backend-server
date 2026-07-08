@@ -110,7 +110,7 @@ async def receive_sensor_result(
 
         # 2. 위험 상황 판별 및 비동기 푸시 알림 트리거
         if result.fall_detected or result.wandering_detected:
-            alert_type = "fall_detected" if result.fall_detected else "zone_exit"
+            alert_type = "fall_detected" if result.fall_detected else "wandering"
 
             # 위에서 조회한 대상자의 보호자 Expo Push Token 조회
             stmt_guard = select(Guardian).where(

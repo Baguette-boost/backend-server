@@ -53,7 +53,7 @@ CREATE INDEX idx_person_gps_time ON gps_logs(person_id, created_at DESC);
 CREATE TABLE IF NOT EXISTS alert_logs (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     person_id INT NOT NULL,
-    alert_type VARCHAR(10) NOT NULL,
+    alert_type VARCHAR(20) NOT NULL,
     message TEXT NOT NULL,
     is_read BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS imu_logs (
     recorded_at TIMESTAMP NOT NULL,
     imu_data JSON NOT NULL,
     sample_count INT NULL,
+    predicted_label BOOLEAN NULL,
     true_label BOOLEAN NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (person_id) REFERENCES tracked_persons(id) ON DELETE CASCADE

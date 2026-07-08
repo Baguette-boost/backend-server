@@ -35,14 +35,13 @@ class AIClient:
             logger.error(f"AI Service timeout for personId: {payload.personId}")
         except httpx.RequestError as e:
             logger.error(f"Connection error to AI Service: {e}")
-            
-            # ai가 연결되지 않았기에, 항상 낙상 true를 반환하는 mock data
+
+            # AI 컨테이너 미연결 시 임시 mock: 비트리거(감지 없음) 반환.
+            # TODO: AI 컨테이너 연동 후 이 mock 블록 제거.
             return AIPredictResponse(
-                personId=1,
-                fall_detection=DetectionResult(
-                    is_triggered=True,
-                    probability=0.9
-                )
+                personId=payload.personId,
+                fall_detection=DetectionResult(is_triggered=False, probability=0.0),
+                wandering_detection=DetectionResult(is_triggered=False, probability=0.0),
             )
         except httpx.HTTPStatusError as e:
             logger.error(f"AI Service returned HTTP {e.response.status_code}")

@@ -6,7 +6,7 @@ router = APIRouter()
 
 class AlertRequest(BaseModel):
     guardian_id: int
-    alert_type: str # zone_exit | fall_detected | offline
+    alert_type: str # wandering | fall_detected | offline
     patient_name: str
     location: str
 

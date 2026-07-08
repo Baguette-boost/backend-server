@@ -15,7 +15,7 @@ class AlertLog(Base):
     person_id: Mapped[int] = mapped_column(
         ForeignKey("tracked_persons.id", ondelete="CASCADE"), nullable=False
     )
-    alert_type: Mapped[str] = mapped_column(String(10), nullable=False) # 예: 'FALL_DETECTED', 'GEOFENCE_EXIT'
+    alert_type: Mapped[str] = mapped_column(String(20), nullable=False) # 'wandering' | 'fall_detected' | 'offline'
     message: Mapped[str] = mapped_column(Text, nullable=False)
     is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"), default=False)
     created_at: Mapped[datetime] = mapped_column(

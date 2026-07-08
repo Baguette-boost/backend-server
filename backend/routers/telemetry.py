@@ -17,12 +17,10 @@ from sqlalchemy import select, update
 from backend.database import get_db, get_independent_session  # DB 의존성 주입
 from backend.models.telemetry import GpsLog, ImuLog
 from backend.schemas.ai import AIPredictRequest
-from backend.services.notification_service import NotificationService, send_emergency_push, get_guardian_token_and_name
+from backend.services.notification_service import NotificationService
 
 import math
-from backend.models.alert import AlertLog
 from backend.models.person import TrackedPerson
-from decimal import Decimal
 
 import os
 from dotenv import load_dotenv
@@ -82,11 +80,14 @@ async def async_insert_gps_log(person_id: int, gps_data: dict):
         db.add(new_gps)
         await db.commit()
 
-# DB에 낙상 의심 IMU 원본 데이터 INSERT (모델 재학습용)
-async def async_insert_imu_log(person_id: int, recorded_at, imu_dict: dict, sample_count: int):
-    """(Background) DB의 imu_logs 테이블에 비동기 INSERT 수행"""
+# 낙상 의심 이벤트 처리: 멱등 저장 + AI 낙상 판정 + 판정 결과 저장 + (낙상 시) 알림 1회
+async def process_fall_suspect(person_id: int, recorded_at, imu_dict: dict, sample_count: int, payload: AIPredictRequest):
+    """(Background) imu_logs 저장(재전송 멱등) → AI 낙상 판정 → predicted_label 기록 → 낙상 시 알림"""
+    guardian_id = None
+    name = ""
+    predicted = None
     async with get_independent_session() as db:
-        # 재전송 멱등 처리: 동일 (person_id, recorded_at) 이 이미 있으면 중복 저장 skip
+        # 재전송 멱등 처리: 동일 (person_id, recorded_at) 이 이미 있으면 저장·판정·알림 모두 skip
         dup = await db.execute(
             select(ImuLog.id).where(
                 ImuLog.person_id == person_id,
@@ -94,20 +95,41 @@ async def async_insert_imu_log(person_id: int, recorded_at, imu_dict: dict, samp
             )
         )
         if dup.scalar_one_or_none() is not None:
-            logger.info(f"[IMU INSERT] 재전송 감지, 저장 skip personId={person_id}, recorded_at={recorded_at}")
+            logger.info(f"[FALL] 재전송 감지, skip personId={person_id}, recorded_at={recorded_at}")
             return
 
-        new_imu = ImuLog(
-            person_id=person_id,
-            recorded_at=recorded_at,   # 낙상 의심 감지 시각 (naive UTC)
-            imu_data=imu_dict,         # {ax, ay, az, wx, wy, wz}
-            sample_count=sample_count,
+        # AI 낙상 판정 (미연결 시 mock 이 비트리거 반환, 초기화 실패 등으로 None 이면 미판정)
+        ai_result = await ai_client.predict(payload)
+        predicted = (
+            ai_result.fall_detection.is_triggered
+            if (ai_result and ai_result.fall_detection is not None) else None
         )
 
-        logger.info(f"[IMU INSERT] personId: {person_id}, recorded_at: {recorded_at}, samples: {sample_count}")
+        # IMU 원본 + AI 예측 저장 (판정 결과와 무관하게 재학습용 원본은 항상 보존)
+        db.add(ImuLog(
+            person_id=person_id,
+            recorded_at=recorded_at,    # 낙상 의심 감지 시각 (naive UTC)
+            imu_data=imu_dict,          # {ax, ay, az, wx, wy, wz}
+            sample_count=sample_count,
+            predicted_label=predicted,  # AI 낙상 예측 (미판정 시 None)
+        ))
 
-        db.add(new_imu)
+        # 알림용 보호자 정보 확보
+        person = (await db.execute(
+            select(TrackedPerson).where(TrackedPerson.id == person_id)
+        )).scalar_one_or_none()
+        if person:
+            guardian_id = person.guardian_id
+            name = person.name
+
+        logger.info(f"[FALL] personId={person_id}, predicted={predicted}, samples={sample_count}")
         await db.commit()
+
+    # 낙상으로 판정된 경우에만 알림 1회 (WebSocket + Expo Push)
+    if predicted and guardian_id:
+        await NotificationService._notify(
+            person_id, guardian_id, "fall_detected", f"{name}님의 낙상이 감지되었습니다"
+        )
 
 # API Endpoints
 
@@ -117,7 +139,7 @@ async def receive_gps(
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db)
 ):
-    """ [디바이스 -> 서버] 10초 주기로 전송되는 GPS 데이터 수신 및 실시간 이탈/오프라인 조건 판정 """
+    """ [디바이스 -> 서버] 주기적으로 전송되는 GPS 데이터 수신 → 버퍼 적재 및 AI 배회 분석 위임 """
     # 직렬화를 위해 Pydantic 모델을 dict로 변환 (timestamp도 문자열로)
     gps_dict = request.gps.dict()
     gps_dict['timestamp'] = gps_dict['timestamp'].isoformat()
@@ -132,39 +154,6 @@ async def receive_gps(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="등록되지 않은 환자입니다")
     
     current_time = utcnow()
-    current_lat = gps_dict['latitude']
-    current_lng = gps_dict['longitude']
-
-    # bounding box 1차 필터링
-    # 안전 반경(m)을 위도, 경도 단위로 환산하여 사각형 경계 생성
-    lat_delta = Decimal(Decimal(person.safe_radius) / Decimal(LAT_METER_PER_DEGREE))
-    lon_delta = Decimal(Decimal(person.safe_radius) / Decimal(LON_METER_PER_DEGREE))
-
-    min_lat, max_lat = person.base_lat - lat_delta, person.base_lat + lat_delta
-    min_lng, max_lng = person.base_lng - lon_delta, person.base_lng + lon_delta
-
-    # 1차 검증: bounding box 내부에 들어오지 않는다면 무조건 하버사인 연산 없이 '안전 구역 외부'로 판단 가능
-    if not (min_lat <= current_lat <= max_lat and min_lng <= current_lng <= max_lng):
-        is_in_safe_zone = False
-        distance = person.safe_radius # 임의 지정 (하버사인 스킵)
-    else:
-        # 사각형 내부의 애매한 지역만 정밀 하버사인 공식 수행
-        distance = calculate_haversine(current_lat, current_lng, person.base_lat, person.base_lng)
-        is_in_safe_zone = distance <= person.safe_radius
-
-    # 재진입 로그 및 알림 폭탄 방지 로직
-    should_trigger_alert = False
-
-    if not is_in_safe_zone:
-        # 최초 이탈 시점에만 알림 트리거 활성화 (기존에 안전구역 내부에 있었던 상태)
-        if not getattr(person, 'is_escaped', False):
-            should_trigger_alert = True
-            person.is_escaped = True # 이탈 상태로 전환
-    else:
-        # 다시 안전구역 안으로 들어오면 이탈 플래그 해제 (재진입 성공)
-        if getattr(person, 'is_escaped', False):
-            person.is_escaped = False
-            # TODO: 보호자에게 '안전 구역 복귀' 알림 전송
 
     # 환자의 활성 상태 및 시간 업데이트    
     update_stmt = (
@@ -175,39 +164,7 @@ async def receive_gps(
     await db.execute(update_stmt)
     await db.commit()
 
-    # 이탈 판정 시 긴급 알림 로깅 및 실시간 트리거
-    if not is_in_safe_zone:
-        alert_msg = f"[긴급] {person.name} 어르신이 안전 구역을 {int(distance - person.safe_radius)}m 벗어났습니다"
-
-        if should_trigger_alert:    
-            # DB에 알림 로그 적재
-            alert_log = AlertLog(
-                person_id=person.id,
-                alert_type="zone_exit",
-                message=alert_msg,
-                created_at=current_time
-            )
-            db.add(alert_log)
-            await db.commit()
-
-            # 보호자의 토큰 및 웹소켓 연동용 정보 조회
-            token_info = await get_guardian_token_and_name(person.id)
-            if token_info:
-                expo_token, guardian_id = token_info["expo_token"], token_info["guardian_id"]
-                
-                # (1) 웹소켓 대시보드 실시간 브로드캐스팅 가동
-                payload_data = {"id": alert_log.id, "type": "zone_exit", "message": alert_msg}
-                background_tasks.add_task(
-                    NotificationService.broadcast_event,
-                    db=db, guardian_id=guardian_id, event_type="alert",
-                    person_id=str(person.id), payload_data=payload_data, payload=None
-                )
-                # (2) 분리된 웹훅 구조의 send_emergency_push 백그라운드 호출
-                background_tasks.add_task(send_emergency_push, expo_token, person.name, "zone_exit")
-
-        return {"status": "false", "message": "zone_exit"}
-    
-    ## 정상 범위 내 존재 시 데이터 적재 및 ai 분석
+    # 수신 데이터 버퍼 적재 및 AI(배회) 분석 위임
 
     # 인메모리 전역 deque 버퍼에 즉시 적재 (가장 오래된 데이터는 자동 pop)
     add_gps_to_buffer(request.personId, gps_dict)
@@ -273,20 +230,16 @@ async def receive_fall_suspect(
             detail="낙상 의심 데이터 처리 중 오류가 발생했습니다"
         )
 
-    # 1. 디바이스에는 즉각적으로 202 Accepted 응답을 반환하기 위해 AI 통신을 백그라운드로 위임
+    # 디바이스에는 즉시 202 Accepted 를 반환하고, 저장·AI 판정·알림은 단일 백그라운드 태스크로 위임
+    # (멱등 저장 → AI 낙상 판정 → predicted_label 기록 → 낙상 시 푸시 1회)
     background_tasks.add_task(
-        ai_client.predict,
-        payload
-    )
-
-    # 2. 재학습용 IMU 원본 데이터를 백그라운드로 저장 (AI 호출과 독립 — AI 실패해도 원본은 보존)
-    background_tasks.add_task(
-        async_insert_imu_log,
+        process_fall_suspect,
         request.personId,
         request.timestamp,
         imu_dict,
         len(request.imuData.ax),
+        payload,
     )
 
-    # 3. 응답 리턴 (FastAPI가 자동으로 202 상태 코드와 함께 아래 JSON을 반환)
+    # 응답 리턴 (FastAPI가 자동으로 202 상태 코드와 함께 아래 JSON을 반환)
     return {"status": "accepted", "message": "Fall suspect data is being processed"}

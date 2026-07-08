@@ -41,8 +41,15 @@ async def send_emergency_push(expo_token: str, elder_name: str, alert_type: str)
 
     expo_push_url = "https://exp.host/--/api/v2/push/send" # expo push service의 rest api 엔드포인트
     
-    # 알림 타입에 따른 메시지 분기
-    body_msg = "낙상이 감지되었습니다. 즉시 확인해주세요!" if alert_type == "fall_detected" else "설정된 안심 구역을 이탈하셨습니다."
+    # 알림 타입에 따른 메시지 분기 (wandering / fall_detected / offline)
+    if alert_type == "fall_detected":
+        body_msg = "낙상이 감지되었습니다. 즉시 확인해주세요!"
+    elif alert_type == "wandering":
+        body_msg = "배회가 감지되었습니다. 확인해주세요."
+    elif alert_type == "offline":
+        body_msg = "기기가 오프라인 상태입니다. 전원을 확인해주세요."
+    else:
+        body_msg = "긴급 상황이 감지되었습니다."
 
     payload = {
         "to": expo_token,
@@ -78,38 +85,40 @@ class NotificationService:
         message_payload = {}
 
         if payload:
-            # AI 컨테이너에 데이터 전달 및 결과 대기
+            # [GPS 경로] 배회(wandering)만 처리한다. 낙상은 /fall-suspect(IMU) 경로가 담당.
             ai_result = await ai_client.predict(payload)
-
             if not ai_result:
                 return
-            
-            # AI 결과 확인
-            is_fall = ai_result.fall_detection.is_triggered if ai_result.fall_detection is not None else False
+
             is_wander = ai_result.wandering_detection.is_triggered if ai_result.wandering_detection is not None else False
 
-            if is_fall or is_wander:
-                # 위험 감지 시, 해당 환자의 보호자 ID 조회
-                async with get_independent_session() as db:
-                    stmt_guard = select(TrackedPerson).where(TrackedPerson.id == person_id)
-                    rst = (await db.execute(stmt_guard)).scalar_one_or_none()
-                    if rst:
-                        guardian_id = rst.guardian_id
-                        name = rst.name
-                
-                if guardian_id:
-                    # 앱으로 보낼 페이로드 구성
-                    return_type = "fall_detected" if is_fall else "zone_exit"
-                    message_payload = {
-                        "type": "alert",
-                        "alert": {
-                            "personId": person_id,
-                            "type": return_type,
-                            "message": f"{name}님의 낙상" if is_fall else f"{name}님의 배회",
-                            "createdAt": isoformat_utc(utcnow()), # UTC ISO 8601 (...Z)
-                            "read": False
-                        }
-                    }
+            async with get_independent_session() as sess:
+                person = (await sess.execute(
+                    select(TrackedPerson).where(TrackedPerson.id == int(person_id))
+                )).scalar_one_or_none()
+                if not person:
+                    return
+
+                if is_wander:
+                    # 이미 배회 상태면 알림 억제 (최초 감지 시 1회만 발송)
+                    if person.is_wandering:
+                        return
+                    person.is_wandering = True
+                    guardian_id = person.guardian_id
+                    name = person.name
+                    await sess.commit()
+                else:
+                    # 배회 아님 → 플래그 해제 (알림 없음)
+                    if person.is_wandering:
+                        person.is_wandering = False
+                        await sess.commit()
+                    return
+
+            # 최초 배회 감지 → 알림 1회 (WebSocket + Expo Push)
+            await NotificationService._notify(
+                person_id, guardian_id, "wandering", f"{name}님의 배회가 감지되었습니다"
+            )
+            return
         else:
             if event_type == "location":
                 message_payload = {
@@ -129,7 +138,7 @@ class NotificationService:
                     "alert": {
                         "id": payload_data.get("id"),
                         "personId": person_id,
-                        "type": payload_data.get("type"),  # zone_exit, fall_detected, offline
+                        "type": payload_data.get("type"),  # wandering, fall_detected, offline
                         "message": payload_data.get("message"),
                         "createdAt": isoformat_utc(utcnow()), # UTC ISO 8601 (...Z)
                         "read": False
@@ -143,18 +152,38 @@ class NotificationService:
         # 1. WebSocket 전송 태스크
         ws_task = manager.send_personal_message(message_payload, guardian_id)
 
-        # 2. Expo Push 전송 태스크
-        if payload:
-            expo_task = NotificationService._send_expo_push(db, guardian_id, {"type": return_type})
-        else:
-            expo_task = NotificationService._send_expo_push(db, guardian_id, payload_data)
+        # 2. Expo Push 전송 태스크 (else 분기 전용 — payload 분기는 위에서 _notify 로 처리 후 return)
+        expo_task = NotificationService._send_expo_push(db, guardian_id, payload_data)
 
         # 두 작업을 병렬로 동시 실행 (I/O 병목 방지)
         results = await asyncio.gather(ws_task, expo_task, return_exceptions=True)
-        
+
         for result in results:
             if isinstance(result, Exception):
                 logger.error(f"Notification task failed: {result}")
+
+    @staticmethod
+    async def _notify(person_id, guardian_id: int, alert_type: str, message: str):
+        """단일 알림 발송: WebSocket + Expo Push (배회/낙상 공용)"""
+        if not guardian_id:
+            return
+        ws_payload = {
+            "type": "alert",
+            "alert": {
+                "personId": str(person_id),
+                "type": alert_type,
+                "message": message,
+                "createdAt": isoformat_utc(utcnow()),  # UTC ISO 8601 (...Z)
+                "read": False,
+            },
+        }
+        ws_task = manager.send_personal_message(ws_payload, guardian_id)
+        async with get_independent_session() as db:
+            expo_task = NotificationService._send_expo_push(db, guardian_id, {"type": alert_type})
+            results = await asyncio.gather(ws_task, expo_task, return_exceptions=True)
+        for r in results:
+            if isinstance(r, Exception):
+                logger.error(f"Notification task failed: {r}")
 
     @staticmethod
     async def _send_expo_push(db: AsyncSession, guardian_id: int, extra_data: dict = None):
@@ -177,8 +206,8 @@ class NotificationService:
 
         title, body = "알림", "새로운 상태 업데이트가 있습니다."
 
-        if alert_type == 'zone_exit':
-            title, body = "🚨 안전 구역 이탈", "안전 구역 이탈이 감지되었습니다"
+        if alert_type == 'wandering':
+            title, body = "🚨 배회 감지", "배회가 감지되었습니다"
         elif alert_type == 'fall_detected':
             title, body = "🚨 위험 상황 발생", "낙상이 감지되었습니다"
         elif alert_type == 'offline':

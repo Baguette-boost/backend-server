@@ -45,6 +45,8 @@ class ImuLog(Base):
     # 낙상 의심 순간의 IMU 6축 윈도우 원본: {ax, ay, az, wx, wy, wz}
     imu_data: Mapped[dict] = mapped_column(JSON, nullable=False)
     sample_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # AI 가 예측한 낙상 여부 (판정 결과 저장 — 미판정/AI 미연결 시 NULL)
+    predicted_label: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     # 사람이 검수한 실제 낙상 여부 (재학습용 지도 라벨)
     true_label: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     # 서버 적재 시각 (recorded_at 과 분리 — 재전송·지연 대비)

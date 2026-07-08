@@ -4,10 +4,6 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.core.buffer import patient_gps_buffer as gps_buffer # dict of deques
-from backend.services.ai_client import ai_client
-from backend.schemas.ai import AIPredictRequest, GPSPoint
-from backend.services.alert_service import save_wandering_alert
 from backend.database import get_independent_session
 from backend.models.person import TrackedPerson
 from backend.models.alert import AlertLog
@@ -21,41 +17,8 @@ scheduler = AsyncIOScheduler()
 
 TIMEOUT_MINUTES = 5 # 오프라인 판정 임계치 (5분)
 
-async def check_wandering_job():
-    logger.info("배회 감지 스케줄러 실행 중...")
-    
-    for person_id, deque_buffer in gps_buffer.items():
-        # 순회 중 버퍼 변경 방지를 위해 리스트로 복사
-        current_gps_data = list(deque_buffer)
-        
-        if not current_gps_data:
-            continue
-            
-        # Pydantic 모델에 맞게 변환 (만약 buffer 내 객체가 이미 dict 형태라면 바로 매핑)
-        gps_points = [
-            GPSPoint(
-                timestamp=point['timestamp'],
-                latitude=point['latitude'],
-                longitude=point['longitude']
-            ) for point in current_gps_data
-        ]
-
-        request_payload = AIPredictRequest(
-            personId=person_id,
-            timestamp=utcnow(),
-            gpsData=gps_points
-            # 배회 스케줄러이므로 imuData는 None
-        )
-
-        # AI 서버로 비동기 요청 (병목 방지)
-        response = await ai_client.predict(request_payload)
-        
-        if response and response.wandering_detection:
-            if response.wandering_detection.is_triggered:
-                await save_wandering_alert(
-                    person_id=person_id,
-                    probability=response.wandering_detection.probability
-                )
+# 배회 감지는 GPS 수신 경로(receive_gps → broadcast_event)에서 매 핑마다 처리하므로
+# 별도 스케줄러 잡(check_wandering_job)은 제거되었다.
 
 async def monitor_device_heartbeats():
     """
@@ -120,8 +83,6 @@ async def monitor_device_heartbeats():
 def start_scheduler():
     logger.info("## [스케줄러] start_scheduler() 함수가 호출되었습니다! ##")
 
-    # 1분 주기로 배회 감지 잡 실행
-    #scheduler.add_job(check_wandering_job, 'interval', minutes=1, id='wandering_check')
     # 1분 주기로 하트비트 모니터링 루프 가동
     scheduler.add_job(monitor_device_heartbeats, 'interval', minutes=1)
     scheduler.start()

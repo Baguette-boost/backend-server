@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 
 from backend.database import get_db, get_independent_session  # DB 의존성 주입
-from backend.models.telemetry import GpsLog
+from backend.models.telemetry import GpsLog, ImuLog
 from backend.schemas.ai import AIPredictRequest
 from backend.services.notification_service import NotificationService, send_emergency_push, get_guardian_token_and_name
 
@@ -80,6 +80,33 @@ async def async_insert_gps_log(person_id: int, gps_data: dict):
         logger.info(f"[DB INSERT] personId: {person_id}, gps: {gps_data}")
 
         db.add(new_gps)
+        await db.commit()
+
+# DB에 낙상 의심 IMU 원본 데이터 INSERT (모델 재학습용)
+async def async_insert_imu_log(person_id: int, recorded_at, imu_dict: dict, sample_count: int):
+    """(Background) DB의 imu_logs 테이블에 비동기 INSERT 수행"""
+    async with get_independent_session() as db:
+        # 재전송 멱등 처리: 동일 (person_id, recorded_at) 이 이미 있으면 중복 저장 skip
+        dup = await db.execute(
+            select(ImuLog.id).where(
+                ImuLog.person_id == person_id,
+                ImuLog.recorded_at == recorded_at,
+            )
+        )
+        if dup.scalar_one_or_none() is not None:
+            logger.info(f"[IMU INSERT] 재전송 감지, 저장 skip personId={person_id}, recorded_at={recorded_at}")
+            return
+
+        new_imu = ImuLog(
+            person_id=person_id,
+            recorded_at=recorded_at,   # 낙상 의심 감지 시각 (naive UTC)
+            imu_data=imu_dict,         # {ax, ay, az, wx, wy, wz}
+            sample_count=sample_count,
+        )
+
+        logger.info(f"[IMU INSERT] personId: {person_id}, recorded_at: {recorded_at}, samples: {sample_count}")
+
+        db.add(new_imu)
         await db.commit()
 
 # API Endpoints
@@ -251,6 +278,15 @@ async def receive_fall_suspect(
         ai_client.predict,
         payload
     )
-    
-    # 2. 응답 리턴 (FastAPI가 자동으로 202 상태 코드와 함께 아래 JSON을 반환)
+
+    # 2. 재학습용 IMU 원본 데이터를 백그라운드로 저장 (AI 호출과 독립 — AI 실패해도 원본은 보존)
+    background_tasks.add_task(
+        async_insert_imu_log,
+        request.personId,
+        request.timestamp,
+        imu_dict,
+        len(request.imuData.ax),
+    )
+
+    # 3. 응답 리턴 (FastAPI가 자동으로 202 상태 코드와 함께 아래 JSON을 반환)
     return {"status": "accepted", "message": "Fall suspect data is being processed"}

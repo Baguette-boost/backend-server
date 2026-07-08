@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 import asyncio
 
 # 내부 모듈 임포트 (경로는 프로젝트 환경에 맞게 수정)
-from backend.schemas.person import PersonCreate, PersonUpdate, PersonResponse, LocationAbstractResponse, LocationResponse, LocationHistoryResponse, ZoneData, DeviceVerifyRequest
+from backend.schemas.person import PersonCreate, PersonUpdate, PersonResponse, LocationAbstractResponse, LocationResponse, LocationHistoryResponse, ZoneData, ZoneUpdate, DeviceVerifyRequest
 from backend.core.security import get_current_user, verify_device_by_token
 
 from backend.database import get_db, get_independent_session
@@ -231,18 +231,20 @@ async def get_person_zones(
     row = result.first()
     return ZoneData(base_lat=row.base_lat, base_lng=row.base_lng, safe_radius=row.safe_radius)
 
-@person_router.patch("/{zoneId}/zones", response_model=ZoneData, tags=["Global Zones Management"])
+@person_router.patch("/{zoneId}/zones", response_model=ZoneData)
 async def update_zone(
     zoneId: int,
-    payload: ZoneData,
+    payload: ZoneUpdate,
     current_guardian: Guardian = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     # 소유권 검증 (본인이 등록한 환자의 안전구역만 수정 가능)
     await check_guardian_ownership(zoneId, current_guardian.id, db)
 
-    # ZoneData 필드명이 DB 컬럼명(base_lat/base_lng/safe_radius)과 일치하므로 그대로 매핑
+    # 부분 수정: 지정한 필드만 반영. ZoneUpdate 필드명이 DB 컬럼명과 일치하므로 그대로 매핑
     values = payload.model_dump(exclude_unset=True)
+    if not values:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="수정할 필드가 없습니다.")
     await db.execute(update(TrackedPerson).where(TrackedPerson.id == zoneId).values(**values))
     await db.commit()
     result = await db.execute(select(TrackedPerson.base_lat, TrackedPerson.base_lng, TrackedPerson.safe_radius).where(TrackedPerson.id == zoneId))

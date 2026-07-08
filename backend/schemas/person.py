@@ -40,6 +40,12 @@ class ZoneData(BaseModel):
     base_lng: Decimal
     safe_radius: int
 
+class ZoneUpdate(BaseModel):
+    # 부분 수정 허용 (지정한 필드만 반영). 응답은 ZoneData(전체 필수)로 반환.
+    base_lat: Optional[Decimal] = None
+    base_lng: Optional[Decimal] = None
+    safe_radius: Optional[int] = None
+
 class ZoneResponse(ZoneData):
     person_id: int
     

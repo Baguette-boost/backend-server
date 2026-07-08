@@ -11,6 +11,7 @@ python-dotenv>=1.0.0
 httpx==0.28.1
 apscheduler>=3.11.0
 exponent-server-sdk==2.2.0
+pytz>=2024.1
 
 pytest>=8.2.0
 pytest-asyncio>=0.24.0

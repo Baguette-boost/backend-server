@@ -2,6 +2,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends
 from pydantic import BaseModel, Field, ConfigDict, AliasChoices
 from typing import Optional
 from datetime import datetime
+from backend.utils.time import to_naive_utc
 from backend.services.notification_service import send_emergency_push
 from backend.database import get_db
 from backend.models.telemetry import GpsLog
@@ -69,8 +70,9 @@ async def receive_sensor_result(
         event_time = None
         if result.server_time:
             try:
-                event_time = datetime.fromisoformat(result.server_time).replace(microsecond=0)
-            except ValueError:
+                # AI 가 UTC 로 보낸다고 가정하되, 오프셋이 붙어 와도 방어적으로 UTC(naive)로 정규화
+                event_time = to_naive_utc(result.server_time).replace(microsecond=0)
+            except (ValueError, TypeError):
                 event_time = None
 
         gps_id = None

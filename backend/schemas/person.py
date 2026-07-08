@@ -3,6 +3,8 @@ from typing import List, Optional
 from datetime import datetime
 from decimal import Decimal
 
+from backend.utils.time import OutgoingUtcDatetime
+
 class PersonCreate(BaseModel):
     name: str = Field(..., description="환자 이름")
     age: int = Field(..., description="환자 연령")
@@ -24,7 +26,7 @@ class PersonResponse(BaseModel):
     age: int
     device_id: str = Field(..., alias="deviceId", description="디바이스 id")
     device_token: str = Field(..., alias="deviceToken", description="디바이스 식별 토큰")
-    created_at: datetime = Field(..., alias="createdAt")
+    created_at: OutgoingUtcDatetime = Field(..., alias="createdAt")
 
     # 해당 pydantic 모델의 동작 방식을 제어하는 규칙 설정
     model_config = ConfigDict(

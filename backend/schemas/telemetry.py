@@ -1,11 +1,13 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional
-from datetime import datetime
 from decimal import Decimal
+
+from backend.utils.time import IncomingUtcDatetime
 
 # --- 1. GPS 관련 스키마 ---
 class GPSPoint(BaseModel):
-    timestamp: datetime
+    # 하드웨어가 UTC 로 보낸다고 가정하되, 오프셋이 붙어 와도 방어적으로 UTC(naive)로 정규화
+    timestamp: IncomingUtcDatetime
     latitude: Decimal
     longitude: Decimal
 
@@ -28,7 +30,7 @@ class IMUData(BaseModel):
 
 class FallSuspectRequest(BaseModel):
     personId: int
-    timestamp: datetime
+    timestamp: IncomingUtcDatetime
     imuData: IMUData
 
 # AI 컨테이너 전송용 스키마(AIPredictRequest)는 backend/schemas/ai.py로 일원화되었습니다.

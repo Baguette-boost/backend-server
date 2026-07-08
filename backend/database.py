@@ -9,7 +9,10 @@ engine = create_async_engine(
     echo=True,
     pool_pre_ping=True,
     pool_size=10,
-    max_overflow=20
+    max_overflow=20,
+    # 커넥션마다 세션 타임존을 UTC 로 고정한다.
+    # 이렇게 하면 func.now()/CURRENT_TIMESTAMP 기본값이 DB 서버 설정과 무관하게 항상 UTC 로 기록된다.
+    connect_args={"init_command": "SET time_zone = '+00:00'"}
 )
 
 AsyncSessionLocal = async_sessionmaker(

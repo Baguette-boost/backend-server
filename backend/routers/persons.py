@@ -15,6 +15,7 @@ from backend.database import get_db, get_independent_session
 from backend.models.person import TrackedPerson
 from backend.models.telemetry import GpsLog
 from backend.models.guardian import Guardian
+from backend.utils.time import to_naive_utc
 
 from typing import Annotated
 
@@ -188,7 +189,12 @@ async def get_person_location_history(
     """지도 경로선 표현용 GPS 시계열 히스토리 데이터 조회"""
     # 1. 소유권 검증
     await check_guardian_ownership(person_id, current_guardian.id, db)
-    
+
+    # 클라이언트가 오프셋을 붙여 보내도(예: +09:00) DB의 naive UTC 컬럼과 비교되도록
+    # 조회 구간을 방어적으로 UTC(naive)로 정규화한다.
+    from_time = to_naive_utc(from_time)
+    to_time = to_naive_utc(to_time)
+
     # 2. DB에서 기간 내 위치 로그 조회
     stmt = select(GpsLog.latitude, GpsLog.longitude).where(
         GpsLog.person_id == person_id,

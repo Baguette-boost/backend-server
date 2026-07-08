@@ -14,6 +14,7 @@ from backend.models.guardian import Guardian
 from backend.models.person import TrackedPerson
 from backend.schemas.ai import AIPredictRequest
 from backend.services.ai_client import ai_client
+from backend.utils.time import utcnow, isoformat_utc
 import httpx
 
 logger = logging.getLogger(__name__)
@@ -105,7 +106,7 @@ class NotificationService:
                             "personId": person_id,
                             "type": return_type,
                             "message": f"{name}님의 낙상" if is_fall else f"{name}님의 배회",
-                            "createdAt": datetime.utcnow().isoformat() + "Z", # 명세서 형식(ISO)
+                            "createdAt": isoformat_utc(utcnow()), # UTC ISO 8601 (...Z)
                             "read": False
                         }
                     }
@@ -130,7 +131,7 @@ class NotificationService:
                         "personId": person_id,
                         "type": payload_data.get("type"),  # zone_exit, fall_detected, offline
                         "message": payload_data.get("message"),
-                        "createdAt": datetime.utcnow().isoformat() + "Z", # 명세서 형식(ISO)
+                        "createdAt": isoformat_utc(utcnow()), # UTC ISO 8601 (...Z)
                         "read": False
                     }
                 }

@@ -31,7 +31,7 @@ services:
     environment:
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1  # 로그가 버퍼링 없이 즉시 터미널에 출력되도록 강제 설정
-      - TZ=UTC       # 컨테이너 타임존을 한국 시간으로 통일
+      - TZ=UTC       # 컨테이너 타임존을 UTC 로 통일 (서버는 시간을 UTC 로 저장/송수신)
     container_name: baguetteboost-backend
     restart: always
     env_file:
@@ -50,7 +50,7 @@ services:
       context: ./ai-model-release
       dockerfile: Dockerfile
     environment:
-      - TZ=Asia/Seoul
+      - TZ=UTC       # AI 가 보내는 시각도 UTC 로 통일 (서버 전역 UTC 규약)
     container_name: baguetteboost-ai
     restart: unless-stopped
     env_file:

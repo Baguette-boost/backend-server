@@ -5,7 +5,7 @@ FROM python:3.11-slim
 # Python이 pyc 파일을 쓰지 않도록 설정하고, stdout/stderr를 버퍼링 없이 출력
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    TZ=Asia/Seoul
+    TZ=UTC
 
 # 작업 디렉토리 설정
 WORKDIR /app

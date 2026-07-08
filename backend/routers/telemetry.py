@@ -3,6 +3,8 @@ from aiomysql import Pool # 기존에 세팅한 커넥션 풀
 import logging
 from datetime import datetime
 
+from backend.utils.time import to_naive_utc, utcnow
+
 from backend.schemas.telemetry import GPSRequest, FallSuspectRequest
 from backend.core.buffer import add_gps_to_buffer, get_patient_gps_history
 from backend.core.security import verify_device_token # 디바이스 인증 의존성 주입
@@ -62,11 +64,8 @@ async def async_insert_gps_log(person_id: int, gps_data: dict):
     """(Background) DB의 gps_logs 테이블에 비동기 INSERT 수행"""
     raw_timestamp = gps_data.get("timestamp")
 
-    # datetime 객체로 복구
-    if isinstance(raw_timestamp, str):
-        raw_timestamp = datetime.fromisoformat(raw_timestamp.replace('Z', ''))
-        
-    clean_timestamp = raw_timestamp.replace(tzinfo=None) if raw_timestamp else datetime.now()
+    # 문자열/aware/naive 무엇이 오든 방어적으로 UTC(naive)로 변환해 저장한다.
+    clean_timestamp = to_naive_utc(raw_timestamp) if raw_timestamp else utcnow()
     
     async with get_independent_session() as db:
         new_gps = GpsLog(
@@ -105,7 +104,7 @@ async def receive_gps(
     if not person:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="등록되지 않은 환자입니다")
     
-    current_time = datetime.utcnow()
+    current_time = utcnow()
     current_lat = gps_dict['latitude']
     current_lng = gps_dict['longitude']
 

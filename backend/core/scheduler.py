@@ -12,6 +12,7 @@ from backend.database import get_independent_session
 from backend.models.person import TrackedPerson
 from backend.models.alert import AlertLog
 from backend.services.notification_service import NotificationService, get_guardian_token_and_name, send_emergency_push
+from backend.utils.time import utcnow
 import asyncio
 
 # logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -41,7 +42,7 @@ async def check_wandering_job():
 
         request_payload = AIPredictRequest(
             personId=person_id,
-            timestamp=datetime.utcnow(),
+            timestamp=utcnow(),
             gpsData=gps_points
             # 배회 스케줄러이므로 imuData는 None
         )
@@ -62,7 +63,7 @@ async def monitor_device_heartbeats():
     상태를 offline으로 변경하고 보호자에게 실시간 오프라인 알림 발행
     """
     async with get_independent_session() as db:  # 스케줄러 내부 독립 세션 생성
-        current_time = datetime.utcnow()
+        current_time = utcnow()
         threshold_time = current_time - timedelta(minutes=TIMEOUT_MINUTES)
         
         logger.info("## [HeartBeat] 오프라인 스캔 루프 시작 ##")

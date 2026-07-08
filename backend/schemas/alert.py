@@ -4,7 +4,7 @@ from datetime import datetime
 class AlertResponse(BaseModel):
     id: int
     person_id: int
-    alert_type: str = Field(..., alias="alertType", description="zone_exit | low_battery | fall_detected | offline")
+    alert_type: str = Field(..., alias="alertType", description="zone_exit | fall_detected | offline")
     message: str
     is_read: bool
     created_at: datetime = Field(..., alias="createdAt")

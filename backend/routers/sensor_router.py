@@ -97,7 +97,6 @@ async def receive_sensor_result(
                 person_id=person_pk,
                 latitude=result.lat,
                 longitude=result.lng,
-                battery=-1,
                 is_fall_detected=result.fall_detected,
                 is_wandering_detected=result.wandering_detected
             )

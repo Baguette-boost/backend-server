@@ -72,7 +72,7 @@ class NotificationService:
     async def broadcast_event(db: AsyncSession, guardian_id: int, event_type: str, person_id: str, payload_data: dict, payload: AIPredictRequest):
         """
         WebSocket(대시보드용)과 Expo Push(모바일용)를 비동기적으로 동시 실행.
-        event_type: 'location', 'telemetry', 'status', 'alert' 중 하나
+        event_type: 'location', 'status', 'alert' 중 하나
         """
         message_payload = {}
 
@@ -116,12 +116,6 @@ class NotificationService:
                     "personId": person_id,
                     "data": payload_data # latitude, longitude, address, zoneLabel, inSafeZone, isFallConfirmed, updatedAt
                 }
-            elif event_type == "telemetry":
-                message_payload = {
-                    "type": "telemetry",
-                    "personId": person_id,
-                    "data": payload_data  # battery, lastUpdated
-                }
             elif event_type == "status":
                 message_payload = {
                     "type": "status",
@@ -134,7 +128,7 @@ class NotificationService:
                     "alert": {
                         "id": payload_data.get("id"),
                         "personId": person_id,
-                        "type": payload_data.get("type"),  # zone_exit, low_battery, fall_detected, offline
+                        "type": payload_data.get("type"),  # zone_exit, fall_detected, offline
                         "message": payload_data.get("message"),
                         "createdAt": datetime.utcnow().isoformat() + "Z", # 명세서 형식(ISO)
                         "read": False
@@ -186,8 +180,6 @@ class NotificationService:
             title, body = "🚨 안전 구역 이탈", "안전 구역 이탈이 감지되었습니다"
         elif alert_type == 'fall_detected':
             title, body = "🚨 위험 상황 발생", "낙상이 감지되었습니다"
-        elif alert_type == 'low_battery':
-            title, body = "🚨 배터리 부족", "기기 배터리가 부족합니다"
         elif alert_type == 'offline':
             title, body = "🚨 오프라인", "기기가 오프라인 상태입니다"
 

@@ -56,7 +56,6 @@ async def generate_trajectory(steps: int = 50, interval_minutes: int = 5):
                 age=70,
                 device_id=target_device_id,
                 device_token="DEVICE_TOKEN",
-                current_battery=80,
                 is_active=True,
                 base_lat=BASE_LAT,
                 base_lng=BASE_LNG,
@@ -80,7 +79,6 @@ async def generate_trajectory(steps: int = 50, interval_minutes: int = 5):
                 person_id=actual_person_id,
                 latitude=current_lat,
                 longitude=current_lng,
-                battery=90,
                 is_fall_detected=False,
                 is_wandering_detected=False,
                 created_at=current_time

@@ -55,7 +55,6 @@ async def register_person(
         age=payload.age,
         device_id=new_device_id,
         device_token=payload.device_token,
-        current_battery=payload.current_battery,
         is_active=True,
         base_lat=payload.base_lat,
         base_lng=payload.base_lng,
@@ -155,7 +154,7 @@ async def get_person_location(
     current_guardian: Guardian = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """최신 위경도, 배터리, AI 최종 낙상 확정 여부 반환"""
+    """최신 위경도, AI 최종 낙상 확정 여부 반환"""
     # 1. 소유권 검증 (중요)
     await check_guardian_ownership(person_id, current_guardian.id, db)
     

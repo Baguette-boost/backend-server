@@ -23,7 +23,6 @@ class TrackedPerson(Base, TimestampMixin):
     age: Mapped[int] = mapped_column(Integer, nullable=False)
     device_id: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
     device_token: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
-    current_battery: Mapped[int] = mapped_column(Integer, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False)
     base_lat: Mapped[float] = mapped_column(DECIMAL(8, 6), nullable=False)
     base_lng: Mapped[float] = mapped_column(DECIMAL(9, 6), nullable=False)

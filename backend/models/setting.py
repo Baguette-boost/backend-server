@@ -18,7 +18,6 @@ class UserSettings(Base):
     )
     push_enabled: Mapped[bool] = mapped_column(Boolean, server_default=text("true"), default=True)
     zone_exit_alert: Mapped[bool] = mapped_column(Boolean, server_default=text("true"), default=True)
-    low_battery_alert: Mapped[bool] = mapped_column(Boolean, server_default=text("false"), default=False)
 
     # Relationships
     guardian: Mapped["Guardian"] = relationship(back_populates="settings")

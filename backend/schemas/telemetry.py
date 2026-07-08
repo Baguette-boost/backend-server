@@ -10,7 +10,6 @@ class GPSPoint(BaseModel):
     longitude: Decimal
 
 class GPSData(GPSPoint):
-    battery: int = Field(default=-1)
     is_fall_detected: bool = Field(default=False)
     is_wandering_detected: bool = Field(default=False)
 

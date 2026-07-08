@@ -73,7 +73,6 @@ async def async_insert_gps_log(person_id: int, gps_data: dict):
             person_id=person_id,
             latitude=gps_data["latitude"],
             longitude=gps_data["longitude"],
-            battery=gps_data["battery"],
             is_fall_detected=gps_data.get("is_fall_detected", False),
             is_wandering_detected=gps_data.get("is_wandering_detected", False),
             created_at=clean_timestamp

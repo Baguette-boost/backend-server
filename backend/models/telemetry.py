@@ -19,7 +19,6 @@ class GpsLog(Base):
     # GPS 무효 구간에서는 AI가 lat/lng 을 보내지 않을 수 있어 nullable 로 둔다.
     latitude: Mapped[Optional[float]] = mapped_column(DECIMAL(8, 6), nullable=True)
     longitude: Mapped[Optional[float]] = mapped_column(DECIMAL(9, 6), nullable=True)
-    battery: Mapped[int] = mapped_column(Integer, nullable=False)
     is_fall_detected: Mapped[bool] = mapped_column(Boolean, server_default=text("false"), default=False)
     is_wandering_detected: Mapped[bool] = mapped_column(Boolean, server_default=text("false"), default=False)
     created_at: Mapped[datetime] = mapped_column(

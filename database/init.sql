@@ -21,7 +21,6 @@ CREATE TABLE IF NOT EXISTS tracked_persons (
     age INT NOT NULL,
     device_id VARCHAR(100) NOT NULL UNIQUE,
     device_token VARCHAR(255) NOT NULL UNIQUE,
-    current_battery INT NOT NULL,
     is_active BOOLEAN NOT NULL,
     base_lat DECIMAL(8, 6) NOT NULL,
     base_lng DECIMAL(9, 6) NOT NULL,
@@ -41,7 +40,6 @@ CREATE TABLE IF NOT EXISTS gps_logs (
     person_id INT NOT NULL,
     latitude DECIMAL(8, 6) NULL,
     longitude DECIMAL(9, 6) NULL,
-    battery INT NOT NULL,
     is_fall_detected BOOLEAN DEFAULT false,
     is_wandering_detected BOOLEAN DEFAULT false,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -70,7 +68,6 @@ CREATE TABLE IF NOT EXISTS user_settings (
     user_id INT NOT NULL,
     push_enabled BOOLEAN DEFAULT true,
     zone_exit_alert BOOLEAN DEFAULT true,
-    low_battery_alert BOOLEAN DEFAULT false,
     FOREIGN KEY (user_id) REFERENCES guardians(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

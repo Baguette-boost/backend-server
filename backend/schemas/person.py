@@ -7,7 +7,6 @@ class PersonCreate(BaseModel):
     name: str = Field(..., description="환자 이름")
     age: int = Field(..., description="환자 연령")
     device_token: str = Field(..., description="페어링할 기기의 MAC 주소")
-    current_battery: int
     base_lat: Decimal
     base_lng: Decimal
     safe_radius: int

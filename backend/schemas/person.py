@@ -16,9 +16,7 @@ class PersonCreate(BaseModel):
 class PersonUpdate(BaseModel):
     name: Optional[str] = None
     age: Optional[int] = None
-    base_lat: Optional[Decimal] = None
-    base_lng: Optional[Decimal] = None
-    safe_radius: Optional[int] = None
+    # 안전구역(base_lat/base_lng/safe_radius)은 /persons/{id}/zones 전용 API 로 일원화
 
 class PersonResponse(BaseModel):
     id: int
@@ -38,8 +36,8 @@ class DeviceVerifyRequest(BaseModel):
     device_token: str
 
 class ZoneData(BaseModel):
-    latitude: Decimal
-    longitude: Decimal
+    base_lat: Decimal
+    base_lng: Decimal
     safe_radius: int
 
 class ZoneResponse(ZoneData):

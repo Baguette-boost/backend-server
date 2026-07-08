@@ -208,29 +208,21 @@
 
 ## 5. 안전구역 (Geofence)
 지도의 안전구역 조회, "안전구역 이탈" 판정, 내정보 "안전구역 설정".
+환자 1명당 원형 안전구역 1개(중심 좌표 `base_lat`/`base_lng` + 반경 `safe_radius`)를 가진다.
 
 ### `GET /persons/:id/zones`
-안전구역 조회
-
-응답 `200`
+안전구역 조회. 응답 `200`
 ```json
-[
-  { "id": "z1", "personId": "2", "label": "주간보호센터", "shape": "circle",
-    "center": { "lat": 37.503, "lng": 127.044 }, "radius": 150 }, ...
-]
+{ "base_lat": 37.50, "base_lng": 127.03, "safe_radius": 100 }
 ```
 
-### `POST /persons/:id/zones`
-안전구역 설정
-
-요청
+### `PATCH /persons/:id/zones`
+안전구역 수정(세 필드 모두 지정). 응답 `200` — 수정된 안전구역.
 ```json
-{ "label": "집", "shape": "circle", "center": { "lat": 37.50, "lng": 127.03 }, "radius": 100 }
+{ "base_lat": 37.50, "base_lng": 127.03, "safe_radius": 120 }
 ```
-응답 `201` — 생성된 `SafeZone`. (`polygon`은 `points: [{lat,lng}, ...]`)
-
-### `PATCH /persons/:id/zones/:zoneId` · `DELETE /persons/:id/zones/:zoneId`
-안전구역 수정 / 삭제(`204`).
+> 대상 환자에 대한 소유권이 없으면 `403`, 존재하지 않으면 `404`.
+> 이름·나이 등 환자 기본 정보 수정은 `PATCH /persons/:id`(안전구역 필드 미포함)로 분리되어 있다.
 
 ---
 
@@ -421,13 +413,9 @@ interface AlertItem {
 }
 
 interface SafeZone {
-  id: string;
-  personId: string;
-  label: string;
-  shape: 'circle' | 'polygon';
-  center?: { lat: number; lng: number };
-  radius?: number;                       // m, circle
-  points?: { lat: number; lng: number }[]; // polygon
+  base_lat: number;
+  base_lng: number;
+  safe_radius: number; // m, 원형 반경
 }
 ```
 
@@ -442,8 +430,8 @@ interface SafeZone {
 | `api.persons.list()` | `GET /persons` |
 | `api.persons.get(id)` | `GET /persons/:id` |
 | `api.telemetry.location(id)` | `GET /persons/:id/location` |
-| `api.telemetry.metrics(id)` | `GET /persons/:id/telemetry` |
-| `api.zones.list(id)` | `GET /persons/:id/zones` |
+| `api.zones.get(id)` | `GET /persons/:id/zones` |
+| `api.zones.update(id, body)` | `PATCH /persons/:id/zones` |
 | `api.alerts.list({filter})` | `GET /alerts` |
 | `api.alerts.markRead(id)` | `PATCH /alerts/:id/read` |
 | `api.push.register(body)` | `POST /devices/push-token` |

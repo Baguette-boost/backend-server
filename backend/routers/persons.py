@@ -219,26 +219,32 @@ async def get_person_location_history(
     return {"history": formatted_history}
 
 @person_router.get("/{zoneId}/zones", response_model=ZoneData)
-async def get_person_zones(zoneId: int, db: AsyncSession = Depends(get_db)):
+async def get_person_zones(
+    zoneId: int,
+    current_guardian: Guardian = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    # 소유권 검증 (본인이 등록한 환자의 안전구역만 조회 가능)
+    await check_guardian_ownership(zoneId, current_guardian.id, db)
+
     result = await db.execute(select(TrackedPerson.base_lat, TrackedPerson.base_lng, TrackedPerson.safe_radius).where(TrackedPerson.id == zoneId))
     row = result.first()
-    if row:
-        return ZoneData(latitude=row.base_lat, longitude=row.base_lng, safe_radius=row.safe_radius)
-    else:
-        return None
+    return ZoneData(base_lat=row.base_lat, base_lng=row.base_lng, safe_radius=row.safe_radius)
 
 @person_router.patch("/{zoneId}/zones", response_model=ZoneData, tags=["Global Zones Management"])
-async def update_zone(zoneId: int, payload: ZoneData, db: AsyncSession = Depends(get_db)):
-    # ZoneData 필드(latitude/longitude)를 DB 컬럼(base_lat/base_lng)으로 매핑
-    values = payload.model_dump(exclude_unset=True)
-    column_map = {"latitude": "base_lat", "longitude": "base_lng", "safe_radius": "safe_radius"}
-    column_values = {column_map[k]: v for k, v in values.items() if k in column_map}
+async def update_zone(
+    zoneId: int,
+    payload: ZoneData,
+    current_guardian: Guardian = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    # 소유권 검증 (본인이 등록한 환자의 안전구역만 수정 가능)
+    await check_guardian_ownership(zoneId, current_guardian.id, db)
 
-    await db.execute(update(TrackedPerson).where(TrackedPerson.id == zoneId).values(**column_values))
+    # ZoneData 필드명이 DB 컬럼명(base_lat/base_lng/safe_radius)과 일치하므로 그대로 매핑
+    values = payload.model_dump(exclude_unset=True)
+    await db.execute(update(TrackedPerson).where(TrackedPerson.id == zoneId).values(**values))
     await db.commit()
     result = await db.execute(select(TrackedPerson.base_lat, TrackedPerson.base_lng, TrackedPerson.safe_radius).where(TrackedPerson.id == zoneId))
     row = result.first()
-    if row:
-        return ZoneData(latitude=row.base_lat, longitude=row.base_lng, safe_radius=row.safe_radius)
-    else:
-        return None
+    return ZoneData(base_lat=row.base_lat, base_lng=row.base_lng, safe_radius=row.safe_radius)

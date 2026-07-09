@@ -22,13 +22,11 @@ class UserUpdate(BaseModel):
 
 class UserSettingsUpdate(BaseModel):
     push_enabled: Optional[bool] = None
-    zone_exit_alert: Optional[bool] = None
 
 
 class UserSettingsResponse(BaseModel):
     user_id: int
     push_enabled: bool
-    zone_exit_alert: bool
 
     model_config = ConfigDict(
         populate_by_name = True,

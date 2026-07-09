@@ -124,7 +124,7 @@ class NotificationService:
                 message_payload = {
                     "type": "location",
                     "personId": person_id,
-                    "data": payload_data # latitude, longitude, address, zoneLabel, inSafeZone, isFallConfirmed, updatedAt
+                    "data": payload_data # latitude, longitude, address, isFallConfirmed, updatedAt
                 }
             elif event_type == "status":
                 message_payload = {

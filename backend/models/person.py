@@ -1,4 +1,4 @@
-from sqlalchemy import String, ForeignKey, Integer, Text, Boolean, DECIMAL, DateTime, func, text
+from sqlalchemy import String, ForeignKey, Integer, Text, Boolean, DateTime, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import List, Optional, TYPE_CHECKING
 
@@ -24,10 +24,6 @@ class TrackedPerson(Base, TimestampMixin):
     device_id: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
     device_token: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    base_lat: Mapped[float] = mapped_column(DECIMAL(8, 6), nullable=False)
-    base_lng: Mapped[float] = mapped_column(DECIMAL(9, 6), nullable=False)
-    safe_radius: Mapped[int] = mapped_column(Integer, nullable=False)
-    is_escaped: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"), default=False)
     is_fall: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"), default=False)
     is_wandering:Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"), default=False)
     # 낙상 후 부동(이동 없음) 판정 에피소드 상태

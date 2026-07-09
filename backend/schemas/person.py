@@ -1,7 +1,6 @@
 from pydantic import BaseModel, Field, ConfigDict, model_serializer
 from typing import List, Optional
 from datetime import datetime
-from decimal import Decimal
 
 from backend.utils.time import OutgoingUtcDatetime
 
@@ -9,14 +8,10 @@ class PersonCreate(BaseModel):
     name: str = Field(..., description="환자 이름")
     age: int = Field(..., description="환자 연령")
     device_token: str = Field(..., description="페어링할 기기의 MAC 주소")
-    base_lat: Decimal
-    base_lng: Decimal
-    safe_radius: int
 
 class PersonUpdate(BaseModel):
     name: Optional[str] = None
     age: Optional[int] = None
-    # 안전구역(base_lat/base_lng/safe_radius)은 /persons/{id}/zones 전용 API 로 일원화
 
 class PersonResponse(BaseModel):
     id: int
@@ -34,24 +29,6 @@ class PersonResponse(BaseModel):
 
 class DeviceVerifyRequest(BaseModel):
     device_token: str
-
-class ZoneData(BaseModel):
-    base_lat: Decimal
-    base_lng: Decimal
-    safe_radius: int
-
-class ZoneUpdate(BaseModel):
-    # 부분 수정 허용 (지정한 필드만 반영). 응답은 ZoneData(전체 필수)로 반환.
-    base_lat: Optional[Decimal] = None
-    base_lng: Optional[Decimal] = None
-    safe_radius: Optional[int] = None
-
-class ZoneResponse(ZoneData):
-    person_id: int
-    
-    model_config = ConfigDict(
-        from_attributes = True
-    )
 
 
 class LocationAbstractResponse(BaseModel):

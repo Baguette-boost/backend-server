@@ -3,12 +3,12 @@ from typing import List
 from datetime import datetime
 import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete, update
+from sqlalchemy import select, delete
 from sqlalchemy.exc import IntegrityError
 import asyncio
 
 # 내부 모듈 임포트 (경로는 프로젝트 환경에 맞게 수정)
-from backend.schemas.person import PersonCreate, PersonUpdate, PersonResponse, LocationAbstractResponse, LocationResponse, LocationHistoryResponse, ZoneData, ZoneUpdate, DeviceVerifyRequest
+from backend.schemas.person import PersonCreate, PersonUpdate, PersonResponse, LocationAbstractResponse, LocationResponse, LocationHistoryResponse, DeviceVerifyRequest
 from backend.core.security import get_current_user, verify_device_by_token
 
 from backend.database import get_db, get_independent_session
@@ -56,10 +56,7 @@ async def register_person(
         age=payload.age,
         device_id=new_device_id,
         device_token=payload.device_token,
-        is_active=True,
-        base_lat=payload.base_lat,
-        base_lng=payload.base_lng,
-        safe_radius=payload.safe_radius
+        is_active=True
     )
     db.add(new_person)
     try:
@@ -217,36 +214,3 @@ async def get_person_location_history(
     ]
 
     return {"history": formatted_history}
-
-@person_router.get("/{zoneId}/zones", response_model=ZoneData)
-async def get_person_zones(
-    zoneId: int,
-    current_guardian: Guardian = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    # 소유권 검증 (본인이 등록한 환자의 안전구역만 조회 가능)
-    await check_guardian_ownership(zoneId, current_guardian.id, db)
-
-    result = await db.execute(select(TrackedPerson.base_lat, TrackedPerson.base_lng, TrackedPerson.safe_radius).where(TrackedPerson.id == zoneId))
-    row = result.first()
-    return ZoneData(base_lat=row.base_lat, base_lng=row.base_lng, safe_radius=row.safe_radius)
-
-@person_router.patch("/{zoneId}/zones", response_model=ZoneData)
-async def update_zone(
-    zoneId: int,
-    payload: ZoneUpdate,
-    current_guardian: Guardian = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    # 소유권 검증 (본인이 등록한 환자의 안전구역만 수정 가능)
-    await check_guardian_ownership(zoneId, current_guardian.id, db)
-
-    # 부분 수정: 지정한 필드만 반영. ZoneUpdate 필드명이 DB 컬럼명과 일치하므로 그대로 매핑
-    values = payload.model_dump(exclude_unset=True)
-    if not values:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="수정할 필드가 없습니다.")
-    await db.execute(update(TrackedPerson).where(TrackedPerson.id == zoneId).values(**values))
-    await db.commit()
-    result = await db.execute(select(TrackedPerson.base_lat, TrackedPerson.base_lng, TrackedPerson.safe_radius).where(TrackedPerson.id == zoneId))
-    row = result.first()
-    return ZoneData(base_lat=row.base_lat, base_lng=row.base_lng, safe_radius=row.safe_radius)

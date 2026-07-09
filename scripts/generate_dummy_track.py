@@ -56,10 +56,7 @@ async def generate_trajectory(steps: int = 50, interval_minutes: int = 5):
                 age=70,
                 device_id=target_device_id,
                 device_token="DEVICE_TOKEN",
-                is_active=True,
-                base_lat=BASE_LAT,
-                base_lng=BASE_LNG,
-                safe_radius=100
+                is_active=True
             )
             session.add(person)
             await session.flush()

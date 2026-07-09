@@ -23,6 +23,7 @@ import time
 import urllib.error
 import urllib.request
 from collections import deque
+from datetime import datetime, timezone
 
 import pandas as pd
 
@@ -72,6 +73,9 @@ def main() -> None:
     ap.add_argument("--accel-impact", type=float, default=2.5)
     ap.add_argument("--gyro-impact", type=float, default=250.0)
     ap.add_argument("--cooldown", type=int, default=40, help="fall-suspect 재전송 억제 표본 수")
+    # live 모드: 각 표본 타임스탬프를 현재(wall-clock UTC)로 재기록해 실기기처럼 보낸다.
+    # (replay 는 xlsx 의 과거 시각을 그대로 써서 낙상 에피소드가 즉시 만료됨)
+    ap.add_argument("--live", action="store_true", help="현재 시각으로 스트리밍(에피소드 유지)")
     args = ap.parse_args()
 
     frame = load_rows(args.source, args.sheet)
@@ -84,10 +88,13 @@ def main() -> None:
     sent_gps = sent_fall = 0
 
     print(f"[feed] rows={len(frame)} person_id={args.person_id} window={args.window} "
+          f"mode={'LIVE(now)' if args.live else 'replay(xlsx-time)'} "
           f"gps={'yes' if has_gps else 'no'} impact(accel>={args.accel_impact},gyro>={args.gyro_impact})", flush=True)
 
     for i, row in enumerate(frame.itertuples(index=False)):
-        ts = pd.Timestamp(row.server_time).isoformat()
+        # live 면 현재 UTC, 아니면 xlsx 원본 시각
+        ts = (datetime.now(timezone.utc).isoformat() if args.live
+              else pd.Timestamp(row.server_time).isoformat())
         sample = {f: float(getattr(row, f)) for f in IMU_FIELDS}
         buf.append(sample)
         if cooldown > 0:

@@ -21,17 +21,13 @@ RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
 # 6. 소스 코드 및 모델 복사
-# 무거운 원본 데이터(xlsx)나 불필요한 캐시 파일은 제외하고 실행에 필요한 디렉토리만 복사
+# predict_server.py 는 scripts/realtime_sensor_lstm.build_features 를 재사용하므로 scripts/ 도 함께 복사
 COPY scripts/ ./scripts/
 COPY models/ ./models/
-COPY ICCAS_total_data_with_fall.xlsx .
+COPY predict_server.py .
 
-# 7. 기본 실행 명령어 설정 (Live 모드)
-# 컨테이너 실행 시 실시간 추론 스크립트를 구동하고, 분석 결과를 백엔드 컨테이너로 전송하도록 세팅
-# 호스트명은 docker-compose.yml의 백엔드 컨테이너 이름(baguetteboost-backend)을 사용
-CMD ["python", "scripts/realtime_sensor_lstm.py", "replay", \
-     "--source", "ICCAS_total_data_with_fall.xlsx", \
-     "--sheet", "data", \
-     "--model", "models/iccas_sensor_lstm_fall.pt", \
-     "--backend-url", "http://baguetteboost-backend:8000/api/sensor-result", \
-     "--device", "cpu"]
+# 7. 기본 실행 명령어 (B 파이프라인: 추론 HTTP 서버)
+# 백엔드(ai_client.predict)가 POST /predict 로 호출하면 컨테이너 안에서 추론해 결과를 반환한다.
+# AI_SERVICE_URL(=http://baguetteboost-ai:5000) 과 포트를 맞춘다.
+EXPOSE 5000
+CMD ["uvicorn", "predict_server:app", "--host", "0.0.0.0", "--port", "5000"]

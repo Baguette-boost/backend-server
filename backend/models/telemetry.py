@@ -1,4 +1,5 @@
 from sqlalchemy import ForeignKey, DECIMAL, Index, DateTime, func, Integer, Boolean, BigInteger, text, JSON
+from sqlalchemy.dialects.mysql import DATETIME as MySQLDateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
@@ -21,8 +22,10 @@ class GpsLog(Base):
     longitude: Mapped[Optional[float]] = mapped_column(DECIMAL(9, 6), nullable=True)
     is_fall_detected: Mapped[bool] = mapped_column(Boolean, server_default=text("false"), default=False)
     is_wandering_detected: Mapped[bool] = mapped_column(Boolean, server_default=text("false"), default=False)
+    # bulk GPS 는 초 이하로만 다른 표본이 몰려오므로 마이크로초(fsp=6)까지 저장해야 표본을 구분한다.
+    # (초 단위면 같은 초의 표본이 한 행으로 뭉개져 덮어써짐 — Blocker 1)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now()
+        MySQLDateTime(fsp=6), server_default=text("CURRENT_TIMESTAMP(6)")
     )
 
     person: Mapped["TrackedPerson"] = relationship(back_populates="gps_logs")

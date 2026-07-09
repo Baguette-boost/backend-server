@@ -12,6 +12,7 @@ from sqlalchemy import select
 from backend.database import get_db, get_independent_session
 from backend.models.guardian import Guardian
 from backend.models.person import TrackedPerson
+from backend.models.alert import AlertLog
 from backend.schemas.ai import AIPredictRequest
 from backend.services.ai_client import ai_client
 from backend.utils.time import utcnow, isoformat_utc
@@ -106,6 +107,13 @@ class NotificationService:
                     person.is_wandering = True
                     guardian_id = person.guardian_id
                     name = person.name
+                    # 이력 저장: _notify 는 실시간(WS+Push) 전용이므로 호출부에서 alert_logs 를 남긴다.
+                    sess.add(AlertLog(
+                        person_id=int(person_id),
+                        alert_type="wandering",
+                        message=f"{name}님의 배회가 감지되었습니다",
+                        created_at=utcnow(),
+                    ))
                     await sess.commit()
                 else:
                     # 배회 아님 → 플래그 해제 (알림 없음)

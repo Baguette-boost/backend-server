@@ -16,6 +16,7 @@ from sqlalchemy import select, update
 
 from backend.database import get_db, get_independent_session  # DB 의존성 주입
 from backend.models.telemetry import GpsLog, ImuLog
+from backend.models.alert import AlertLog
 from backend.schemas.ai import AIPredictRequest
 from backend.services.notification_service import NotificationService
 
@@ -85,10 +86,11 @@ async def process_fall_suspect(person_id: int, recorded_at, imu_dict: dict, samp
     """(Background) imu_logs 저장(재전송 멱등) → AI 낙상 판정 → predicted_label 기록 → 낙상 시 알림"""
     guardian_id = None
     name = ""
+    newly_started = False   # 이번 판정이 '새 낙상 에피소드'를 여는 상승엣지인지
 
     # AI 낙상 판정은 DB 세션 밖에서 수행한다 (예측 대기 동안 커넥션 풀 점유 방지).
     # 트레이드오프: 재전송 시 predict 가 한 번 더 호출될 수 있으나, 낙상은 이벤트 기반이라 빈도가 낮다.
-    # (미연결 시 mock 이 비트리거 반환, 초기화 실패 등으로 None 이면 미판정)
+    # (미연결·초기화 실패·타임아웃 등으로 predict 가 None 이면 predicted_label=None 으로 미판정 처리)
     ai_result = await ai_client.predict(payload)
     predicted = (
         ai_result.fall_detection.is_triggered
@@ -124,19 +126,31 @@ async def process_fall_suspect(person_id: int, recorded_at, imu_dict: dict, samp
             guardian_id = person.guardian_id
             name = person.name
             if predicted:
+                # fall_pending 이 아직 False 면 이번이 새 에피소드의 시작(상승엣지)
+                newly_started = not person.fall_pending
                 person.is_fall = True
-                if not person.fall_pending:
+                if newly_started:
                     # 새 에피소드 시작 (윈도우 시작 시각 고정)
                     person.fall_started_at = recorded_at
                     person.fall_pending = True
                 # 매 낙상 판정마다 마감 기준 갱신 (10분 타이머 리셋)
                 person.fall_last_at = recorded_at
 
-        logger.info(f"[FALL] personId={person_id}, predicted={predicted}, samples={sample_count}")
+                # 이력 저장: _notify 는 실시간(WS+Push) 전용이므로 호출부에서 alert_logs 를 남긴다.
+                # 에피소드당 1회만 기록해 같은 낙상의 반복 알림을 억제한다.
+                if newly_started:
+                    db.add(AlertLog(
+                        person_id=person_id,
+                        alert_type="fall_detected",
+                        message=f"{name}님의 낙상이 감지되었습니다",
+                        created_at=utcnow(),
+                    ))
+
+        logger.info(f"[FALL] personId={person_id}, predicted={predicted}, samples={sample_count}, new_episode={newly_started}")
         await db.commit()
 
-    # 낙상으로 판정된 경우에만 알림 1회 (WebSocket + Expo Push)
-    if predicted and guardian_id:
+    # 새 낙상 에피소드가 시작된 경우에만 실시간 알림 1회 (WebSocket + Expo Push)
+    if predicted and newly_started and guardian_id:
         await NotificationService._notify(
             person_id, guardian_id, "fall_detected", f"{name}님의 낙상이 감지되었습니다"
         )

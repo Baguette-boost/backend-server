@@ -21,6 +21,10 @@ class GPSRequest(BaseModel):
 
 # --- 2. 낙상 의심 (IMU) 관련 스키마 ---
 class IMUData(BaseModel):
+    # 낙상 분류기 입력 피처: roll/pitch/yaw + 가속도(ax..az) + 자이로(wx..wz)
+    roll: List[float] = Field(default_factory=list)
+    pitch: List[float] = Field(default_factory=list)
+    yaw: List[float] = Field(default_factory=list)
     ax: List[float] = Field(default_factory=list)
     ay: List[float] = Field(default_factory=list)
     az: List[float] = Field(default_factory=list)

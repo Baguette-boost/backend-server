@@ -12,6 +12,11 @@ AiUtcDatetime = Annotated[
 ]
 
 class IMUData(BaseModel):
+    # 낙상 분류기 입력 피처: roll/pitch/yaw + 가속도(ax..az) + 자이로(wx..wz).
+    # (accel_norm/gyro_norm/dt_s 파생 피처는 AI 서버가 계산한다)
+    roll: List[float]
+    pitch: List[float]
+    yaw: List[float]
     ax: List[float]
     ay: List[float]
     az: List[float]

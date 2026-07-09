@@ -1,7 +1,7 @@
 import httpx
 import logging
 from backend.config import settings
-from backend.schemas.ai import AIPredictRequest, AIPredictResponse, DetectionResult
+from backend.schemas.ai import AIPredictRequest, AIPredictResponse
 
 logger = logging.getLogger(__name__)
 
@@ -35,14 +35,6 @@ class AIClient:
             logger.error(f"AI Service timeout for personId: {payload.personId}")
         except httpx.RequestError as e:
             logger.error(f"Connection error to AI Service: {e}")
-
-            # AI 컨테이너 미연결 시 임시 mock: 비트리거(감지 없음) 반환.
-            # TODO: AI 컨테이너 연동 후 이 mock 블록 제거.
-            return AIPredictResponse(
-                personId=payload.personId,
-                fall_detection=DetectionResult(is_triggered=False, probability=0.0),
-                wandering_detection=DetectionResult(is_triggered=False, probability=0.0),
-            )
         except httpx.HTTPStatusError as e:
             logger.error(f"AI Service returned HTTP {e.response.status_code}")
         except Exception as e:

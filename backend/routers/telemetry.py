@@ -85,9 +85,18 @@ async def process_fall_suspect(person_id: int, recorded_at, imu_dict: dict, samp
     """(Background) imu_logs 저장(재전송 멱등) → AI 낙상 판정 → predicted_label 기록 → 낙상 시 알림"""
     guardian_id = None
     name = ""
-    predicted = None
+
+    # AI 낙상 판정은 DB 세션 밖에서 수행한다 (예측 대기 동안 커넥션 풀 점유 방지).
+    # 트레이드오프: 재전송 시 predict 가 한 번 더 호출될 수 있으나, 낙상은 이벤트 기반이라 빈도가 낮다.
+    # (미연결 시 mock 이 비트리거 반환, 초기화 실패 등으로 None 이면 미판정)
+    ai_result = await ai_client.predict(payload)
+    predicted = (
+        ai_result.fall_detection.is_triggered
+        if (ai_result and ai_result.fall_detection is not None) else None
+    )
+
     async with get_independent_session() as db:
-        # 재전송 멱등 처리: 동일 (person_id, recorded_at) 이 이미 있으면 저장·판정·알림 모두 skip
+        # 재전송 멱등 처리: 동일 (person_id, recorded_at) 이 이미 있으면 저장·상태갱신·알림 모두 skip
         dup = await db.execute(
             select(ImuLog.id).where(
                 ImuLog.person_id == person_id,
@@ -98,13 +107,6 @@ async def process_fall_suspect(person_id: int, recorded_at, imu_dict: dict, samp
             logger.info(f"[FALL] 재전송 감지, skip personId={person_id}, recorded_at={recorded_at}")
             return
 
-        # AI 낙상 판정 (미연결 시 mock 이 비트리거 반환, 초기화 실패 등으로 None 이면 미판정)
-        ai_result = await ai_client.predict(payload)
-        predicted = (
-            ai_result.fall_detection.is_triggered
-            if (ai_result and ai_result.fall_detection is not None) else None
-        )
-
         # IMU 원본 + AI 예측 저장 (판정 결과와 무관하게 재학습용 원본은 항상 보존)
         db.add(ImuLog(
             person_id=person_id,
@@ -114,13 +116,21 @@ async def process_fall_suspect(person_id: int, recorded_at, imu_dict: dict, samp
             predicted_label=predicted,  # AI 낙상 예측 (미판정 시 None)
         ))
 
-        # 알림용 보호자 정보 확보
+        # 알림용 보호자 정보 확보 및 낙상 시 부동 판정 에피소드 시작/갱신
         person = (await db.execute(
             select(TrackedPerson).where(TrackedPerson.id == person_id)
         )).scalar_one_or_none()
         if person:
             guardian_id = person.guardian_id
             name = person.name
+            if predicted:
+                person.is_fall = True
+                if not person.fall_pending:
+                    # 새 에피소드 시작 (윈도우 시작 시각 고정)
+                    person.fall_started_at = recorded_at
+                    person.fall_pending = True
+                # 매 낙상 판정마다 마감 기준 갱신 (10분 타이머 리셋)
+                person.fall_last_at = recorded_at
 
         logger.info(f"[FALL] personId={person_id}, predicted={predicted}, samples={sample_count}")
         await db.commit()

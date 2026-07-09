@@ -1,6 +1,6 @@
 from sqlalchemy import String, ForeignKey, Integer, Text, Boolean, DECIMAL, DateTime, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from typing import List, TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING
 
 from datetime import datetime
 
@@ -30,6 +30,10 @@ class TrackedPerson(Base, TimestampMixin):
     is_escaped: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"), default=False)
     is_fall: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"), default=False)
     is_wandering:Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"), default=False)
+    # 낙상 후 부동(이동 없음) 판정 에피소드 상태
+    fall_pending: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"), default=False)
+    fall_started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)  # 에피소드(윈도우) 시작 시각
+    fall_last_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)      # 마지막 낙상 판정 시각(마감 기준)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now()
     )

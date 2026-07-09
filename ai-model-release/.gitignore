@@ -9,8 +9,6 @@
 !requirements.txt
 !.gitignore
 !ICCAS_total_data_with_fall.xlsx
-!feed_replay.py
-!predict_server.py
 
 !docs/
 !docs/FINAL_DATA_TRAINING_REPORT.md

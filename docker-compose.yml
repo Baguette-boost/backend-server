@@ -47,8 +47,9 @@ services:
 
   baguetteboost-ai:
     build:
-      context: ./ai-model-release
-      dockerfile: Dockerfile
+      # 컨텍스트는 repo 루트: ai-serve(우리 서버) + ai-model-release(팀원 원본 모델/스크립트) 둘 다 접근
+      context: .
+      dockerfile: ai-serve/Dockerfile
     environment:
       - TZ=UTC       # AI 가 보내는 시각도 UTC 로 통일 (서버 전역 UTC 규약)
     container_name: baguetteboost-ai

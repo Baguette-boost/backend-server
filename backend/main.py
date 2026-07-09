@@ -15,8 +15,6 @@ from backend.routers.guardians import guardian_router
 from backend.routers.persons import person_router
 from backend.routers.telemetry import telemetry_router
 
-from backend.routers.sensor_router import ai_router
-
 import logging
 import time
 from datetime import datetime
@@ -93,9 +91,6 @@ app.include_router(person_router)
 
 # telemetry 라우터 등록
 app.include_router(telemetry_router)
-
-# ai 라우터 등록
-app.include_router(ai_router)
 
 # alert 라우터 등록
 app.include_router(alert_router)

@@ -152,11 +152,11 @@ async def get_person_location(
     current_guardian: Guardian = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """최신 위경도, AI 최종 낙상 확정 여부 반환"""
-    # 1. 소유권 검증 (중요)
-    await check_guardian_ownership(person_id, current_guardian.id, db)
-    
-    # 2. 캐시(Redis) 또는 DB에서 최신 위치 데이터 조회
+    """최신 위경도 + 환자의 현재 낙상/배회 상태 반환"""
+    # 1. 소유권 검증 (중요) — 검증과 함께 대상자(person)를 확보
+    person = await check_guardian_ownership(person_id, current_guardian.id, db)
+
+    # 2. DB에서 최신 위치 데이터 조회 (위경도는 gps_logs 최신 1행)
     stmt = select(GpsLog).where(
         GpsLog.person_id == person_id
     ).order_by(GpsLog.created_at.desc())
@@ -165,12 +165,14 @@ async def get_person_location(
 
     if not latest_log:
         raise HTTPException(status_code=404, detail="위치 데이터를 찾을 수 없습니다.")
-    
+
+    # 낙상/배회는 gps_logs 플래그(파이프라인 A 제거로 미사용)가 아니라
+    # 에피소드 상태(person.is_fall / person.is_wandering)를 반영한다.
     latest_location = {
         "latitude": latest_log.latitude,
         "longitude": latest_log.longitude,
-        "is_fall": latest_log.is_fall_detected, # AI 통신 결과값 반영
-        "is_wandering": latest_log.is_wandering_detected
+        "is_fall": person.is_fall,
+        "is_wandering": person.is_wandering
     }
 
     return latest_location

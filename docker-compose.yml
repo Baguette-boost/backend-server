@@ -53,7 +53,7 @@ services:
       dockerfile: ai-serve/Dockerfile
     environment:
       - TZ=UTC
-      - FALL_MODEL_PATH=models/iccas_final_lstm_imu_fall.pt
+      - FALL_MODEL_PATH=models/v3_tcn_imu_fall.pt
       - WANDER_MODEL_PATH=            # 비움 → 배회 미로드(낙상 전용)
     container_name: baguetteboost-ai-fall
     restart: unless-stopped

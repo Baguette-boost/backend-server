@@ -65,7 +65,7 @@ def main() -> None:
     ap.add_argument("--backend-url", default="http://baguetteboost-backend:8000")
     ap.add_argument("--person-id", type=int, required=True)
     ap.add_argument("--device-token", default="replay-feeder")
-    ap.add_argument("--window", type=int, default=20, help="fall-suspect 로 보낼 IMU 표본 수(>= 모델 seq)")
+    ap.add_argument("--window", type=int, default=50, help="fall-suspect 로 보낼 IMU 표본 수(>= 모델 seq; TCN=50)")
     ap.add_argument("--sleep", type=float, default=0.02)
     ap.add_argument("--gps-every", type=int, default=1, help="N행마다 GPS 전송(다운샘플)")
     # 실제 기기처럼 IMU 임팩트(가속/자이로 급변)에서 fall-suspect 를 올린다.

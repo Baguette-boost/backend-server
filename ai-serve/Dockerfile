@@ -21,6 +21,8 @@ RUN pip install --upgrade pip && \
 # predict_server 는 scripts/realtime_sensor_lstm.build_features 를 재사용하므로 scripts/ 필요.
 COPY ai-model-release/scripts/ ./scripts/
 COPY ai-model-release/models/ ./models/
+# 낙상 TCN 최종 모델(팀원 final-tcn-server) — ./models/ 로 병합
+COPY ai-model-release/final-tcn-server/models/ ./models/
 
 # 우리 서버 코드
 COPY ai-serve/predict_server.py .

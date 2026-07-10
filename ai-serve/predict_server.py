@@ -3,9 +3,9 @@
 백엔드(ai_client.predict)가 원본 IMU/GPS 를 담아 POST /predict 로 호출하면,
 컨테이너 안에서 모델 추론을 수행해 낙상/배회 판정을 돌려준다.
 
-- 낙상: iccas_specialized_binary_lstm 계열 IMU 분류기 (BinaryLSTM, sigmoid→threshold)
-        피처엔지니어링은 학습과 동일하게 realtime_sensor_lstm.build_features 를 재사용한다.
-- 배회: 모델 미확정 → 현재는 stub(비트리거). 파이프라인만 구축하고 모델은 추후 연결.
+- 낙상: TCN(v3_binary_imu_fall_tcn) IMU 분류기. 모델 클래스·전처리는 팀원의
+        final-tcn-server/app.py 에서 포팅. (구 specialized_binary_lstm 도 계속 로드 가능)
+- 배회: specialized_binary_lstm(GPS) 분류기. build_features 재사용.
 
 계약(스키마)은 backend/schemas/ai.py 의 AIPredictRequest / AIPredictResponse 와 일치한다.
 """
@@ -26,23 +26,20 @@ from torch import nn
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-# --- realtime_sensor_lstm 의 피처엔지니어링을 그대로 재사용 (학습·추론 피처 동일성 보장) ---
+# --- realtime_sensor_lstm 의 피처엔지니어링을 그대로 재사용 (배회 GPS 피처용) ---
 sys.path.insert(0, str(Path(__file__).resolve().parent / "scripts"))
 from realtime_sensor_lstm import build_features, IMU_COLUMNS  # noqa: E402
 
 logger = logging.getLogger("predict_server")
 logging.basicConfig(level=logging.INFO)
 
-# 낙상 모델 경로 (Stage 1: 로더가 지원하는 specialized binary 모델로 검증)
-FALL_MODEL_PATH = os.environ.get("FALL_MODEL_PATH", "models/iccas_final_lstm_imu_fall.pt")
-# 배회 모델은 미확정 → 경로가 주어지면 로드, 없으면 stub
+# 낙상 모델(TCN) / 배회 모델(GPS LSTM) 경로. 컨테이너별로 자기 역할만 설정.
+FALL_MODEL_PATH = os.environ.get("FALL_MODEL_PATH", "models/v3_tcn_imu_fall.pt")
 WANDER_MODEL_PATH = os.environ.get("WANDER_MODEL_PATH", "")
-# 기기가 per-sample 타임스탬프를 보내지 않으므로 dt_s 계산용 고정 샘플 간격(초).
-# 학습 dt_s 와의 미세한 skew 는 감수(파이프라인 검증 목적). 필요 시 계약에 per-sample time 추가.
+# 배회(LSTM) 프레임의 dt_s 합성용 고정 샘플 간격(초).
 DEFAULT_SAMPLE_INTERVAL_S = float(os.environ.get("SAMPLE_INTERVAL_S", "0.05"))
 
 
-# --- train_specialized_sensor_lstm.py 에서 그대로 가져온 정의(추론에 필요한 최소) ---
 class RobustScaler:
     def __init__(self, center: np.ndarray, scale: np.ndarray) -> None:
         self.center = center.astype(np.float32)
@@ -53,6 +50,9 @@ class RobustScaler:
         return np.clip(scaled, -12.0, 12.0).astype(np.float32)
 
 
+# ─────────────────────────────────────────────────────────────
+# 배회: specialized binary LSTM
+# ─────────────────────────────────────────────────────────────
 class BinaryLSTM(nn.Module):
     def __init__(self, input_size: int, hidden_size: int, num_layers: int, dropout: float) -> None:
         super().__init__()
@@ -71,7 +71,7 @@ class BinaryLSTM(nn.Module):
 
 
 class BinaryPredictor:
-    """specialized binary LSTM(.pt) 하나를 로드해 시퀀스 확률을 내는 추론기."""
+    """specialized binary LSTM(.pt) 하나를 로드해 시퀀스 확률을 내는 추론기 (배회용)."""
 
     def __init__(self, model_path: str) -> None:
         ckpt = torch.load(model_path, map_location="cpu", weights_only=False)
@@ -93,13 +93,9 @@ class BinaryPredictor:
         )
         self.model.load_state_dict(ckpt["model_state"])
         self.model.eval()
-        logger.info(
-            "loaded %s task=%s seq=%d thr=%.3f feat=%d",
-            model_path, self.task, self.sequence_length, self.threshold, len(self.feature_columns),
-        )
+        logger.info("loaded LSTM %s task=%s seq=%d thr=%.3f", model_path, self.task, self.sequence_length, self.threshold)
 
     def _score(self, featured: pd.DataFrame) -> Optional[float]:
-        """featured DataFrame 의 마지막 sequence_length 윈도우로 sigmoid 확률을 낸다."""
         values = featured[self.feature_columns].to_numpy(dtype=np.float32)
         if len(values) < self.sequence_length:
             return None
@@ -110,29 +106,146 @@ class BinaryPredictor:
         return float(torch.sigmoid(logit).item())
 
 
-def _imu_to_frame(imu: "ImuData", n: int) -> pd.DataFrame:
-    """IMU 리스트를 build_features 가 먹는 DataFrame 으로 재구성.
+# ─────────────────────────────────────────────────────────────
+# 낙상: TCN (팀원 final-tcn-server/app.py 에서 포팅)
+# ─────────────────────────────────────────────────────────────
+class Chomp1d(nn.Module):
+    def __init__(self, chomp_size: int) -> None:
+        super().__init__()
+        self.chomp_size = chomp_size
 
-    per-sample 시간이 없으므로 고정 간격으로 server_time 을 합성한다(dt_s 용).
-    낙상 모델 피처엔 GPS 파생이 없으므로 lat/lng/gps_valid 는 더미(0)로 채운다.
-    """
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if self.chomp_size == 0:
+            return x
+        return x[:, :, : -self.chomp_size].contiguous()
+
+
+class TemporalBlock(nn.Module):
+    def __init__(self, in_channels: int, out_channels: int, kernel_size: int, dilation: int, dropout: float) -> None:
+        super().__init__()
+        padding = (kernel_size - 1) * dilation
+        self.network = nn.Sequential(
+            nn.Conv1d(in_channels, out_channels, kernel_size, padding=padding, dilation=dilation),
+            Chomp1d(padding),
+            nn.BatchNorm1d(out_channels),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Conv1d(out_channels, out_channels, kernel_size, padding=padding, dilation=dilation),
+            Chomp1d(padding),
+            nn.BatchNorm1d(out_channels),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+        )
+        self.downsample = nn.Conv1d(in_channels, out_channels, 1) if in_channels != out_channels else nn.Identity()
+        self.activation = nn.ReLU()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.activation(self.network(x) + self.downsample(x))
+
+
+class TCNFallModel(nn.Module):
+    def __init__(self, input_size: int, hidden_size: int, num_layers: int, kernel_size: int, dropout: float) -> None:
+        super().__init__()
+        blocks = []
+        in_channels = input_size
+        for index in range(num_layers):
+            blocks.append(TemporalBlock(in_channels, hidden_size, kernel_size, dilation=2**index, dropout=dropout))
+            in_channels = hidden_size
+        self.encoder = nn.Sequential(*blocks)
+        self.head = nn.Sequential(nn.LayerNorm(hidden_size), nn.Dropout(dropout), nn.Linear(hidden_size, 1))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        encoded = self.encoder(x.transpose(1, 2)).transpose(1, 2)
+        pooled = encoded.mean(dim=1)
+        return self.head(pooled).squeeze(-1)
+
+
+class TcnFallPredictor:
+    """TCN IMU 낙상 추론기. IMU 리스트 → 12피처(accel_norm/gyro_norm/dt_s 포함) → sigmoid."""
+
+    def __init__(self, model_path: str) -> None:
+        ckpt = torch.load(model_path, map_location="cpu", weights_only=False)
+        self.feature_columns: List[str] = list(ckpt["feature_columns"])
+        self.sequence_length = int(ckpt["sequence_length"])
+        self.sample_ms = int(ckpt.get("sample_ms", 40))
+        self.threshold = float(ckpt["threshold"])
+        self.scaler = RobustScaler(
+            np.asarray(ckpt["scaler_center"], dtype=np.float32),
+            np.asarray(ckpt["scaler_scale"], dtype=np.float32),
+        )
+        self.model = TCNFallModel(
+            len(self.feature_columns),
+            int(ckpt["hidden_size"]),
+            int(ckpt["num_layers"]),
+            int(ckpt["kernel_size"]),
+            float(ckpt["dropout"]),
+        )
+        self.model.load_state_dict(ckpt["model_state"])
+        self.model.eval()
+        logger.info("loaded TCN %s seq=%d thr=%.3f feat=%d", model_path, self.sequence_length, self.threshold, len(self.feature_columns))
+
+    def _features(self, imu: "ImuData", n: int) -> np.ndarray:
+        # app.py sample_to_features 와 동일: per-sample 시간이 없으므로 dt_s 는 첫점 0, 이후 sample_ms/1000.
+        dt = self.sample_ms / 1000.0
+        rows: list[list[float]] = []
+        for i in range(n):
+            ax, ay, az = float(imu.ax[i]), float(imu.ay[i]), float(imu.az[i])
+            wx, wy, wz = float(imu.wx[i]), float(imu.wy[i]), float(imu.wz[i])
+            row = {
+                "roll": float(imu.roll[i]), "pitch": float(imu.pitch[i]), "yaw": float(imu.yaw[i]),
+                "ax": ax, "ay": ay, "az": az, "wx": wx, "wy": wy, "wz": wz,
+                "accel_norm": float(np.sqrt(ax * ax + ay * ay + az * az)),
+                "gyro_norm": float(np.sqrt(wx * wx + wy * wy + wz * wz)),
+                "dt_s": 0.0 if i == 0 else dt,
+            }
+            rows.append([row[c] for c in self.feature_columns])
+        return np.asarray(rows, dtype=np.float32)
+
+    def predict_fall(self, imu: "ImuData") -> Optional[float]:
+        n = len(imu.ax)
+        if n < self.sequence_length:
+            return None
+        feats = self._features(imu, n)[-self.sequence_length:]
+        window = self.scaler.transform(feats)
+        with torch.no_grad():
+            logit = self.model(torch.from_numpy(window[None, :, :]).to(dtype=torch.float32))
+        return float(torch.sigmoid(logit).item())
+
+
+class LstmImuFallPredictor:
+    """구 specialized_binary_lstm IMU 낙상 모델용 어댑터(하위호환). predict_fall 인터페이스 통일."""
+
+    def __init__(self, model_path: str) -> None:
+        self.inner = BinaryPredictor(model_path)
+        self.sequence_length = self.inner.sequence_length
+        self.threshold = self.inner.threshold
+
+    def predict_fall(self, imu: "ImuData") -> Optional[float]:
+        n = len(imu.ax)
+        if n < self.sequence_length:
+            return None
+        frame = _imu_to_frame(imu, n)
+        featured, _, _ = build_features(frame, origin_lat=0.0, origin_lng=0.0)
+        return self.inner._score(featured)
+
+
+def build_fall_predictor(model_path: str):
+    """체크포인트 model_type 으로 낙상 추론기 선택 (tcn → TCN, 그 외 → LSTM 어댑터)."""
+    model_type = str(torch.load(model_path, map_location="cpu", weights_only=False).get("model_type", ""))
+    if "tcn" in model_type.lower():
+        return TcnFallPredictor(model_path)
+    return LstmImuFallPredictor(model_path)
+
+
+def _imu_to_frame(imu: "ImuData", n: int) -> pd.DataFrame:
+    """(LSTM 낙상 하위호환용) IMU 리스트를 build_features 가 먹는 DataFrame 으로 재구성."""
     base = pd.Timestamp("2000-01-01")
     server_time = base + pd.to_timedelta(np.arange(n) * DEFAULT_SAMPLE_INTERVAL_S, unit="s")
     data = {
-        "device": ["0"] * n,
-        "server_time": server_time,
-        "roll": imu.roll,
-        "pitch": imu.pitch,
-        "yaw": imu.yaw,
-        "ax": imu.ax,
-        "ay": imu.ay,
-        "az": imu.az,
-        "wx": imu.wx,
-        "wy": imu.wy,
-        "wz": imu.wz,
-        "lat": [0.0] * n,
-        "lng": [0.0] * n,
-        "gps_valid": [0.0] * n,
+        "device": ["0"] * n, "server_time": server_time,
+        "roll": imu.roll, "pitch": imu.pitch, "yaw": imu.yaw,
+        "ax": imu.ax, "ay": imu.ay, "az": imu.az, "wx": imu.wx, "wy": imu.wy, "wz": imu.wz,
+        "lat": [0.0] * n, "lng": [0.0] * n, "gps_valid": [0.0] * n,
     }
     return pd.DataFrame(data)
 
@@ -140,10 +253,8 @@ def _imu_to_frame(imu: "ImuData", n: int) -> pd.DataFrame:
 def _gps_to_frame(points: list) -> pd.DataFrame:
     """GPS 궤적을 build_features 가 먹는 DataFrame 으로 재구성(배회 피처용).
 
-    x_m/y_m 는 origin(원점) 기준 절대 위치인데 체크포인트에 origin 이 없어,
-    build_features(origin=None) 로 '배치 GPS 중앙값'을 원점으로 근사한다.
-    (이동 피처 dx_m/dy_m/speed_mps/dt_s/gps_valid 는 원점과 무관하게 정확)
-    낙상 피처가 아니므로 IMU 컬럼은 더미(0)로 채운다(build_features 가 참조만 하고 배회 피처엔 미포함).
+    x_m/y_m 는 origin 기준 절대위치인데 체크포인트에 origin 이 없어 build_features(origin=None)로
+    배치 GPS 중앙값을 원점으로 근사한다(이동 피처 dx/dy/speed/dt_s 는 원점 무관하게 정확).
     """
     n = len(points)
     times = [pd.to_datetime(p.timestamp, errors="coerce") if p.timestamp else pd.NaT for p in points]
@@ -152,10 +263,8 @@ def _gps_to_frame(points: list) -> pd.DataFrame:
         base = pd.Timestamp("2000-01-01")
         server_time = pd.Series(base + pd.to_timedelta(np.arange(n), unit="s"))
     data = {
-        "device": ["0"] * n,
-        "server_time": server_time,
-        "lat": [float(p.latitude) for p in points],
-        "lng": [float(p.longitude) for p in points],
+        "device": ["0"] * n, "server_time": server_time,
+        "lat": [float(p.latitude) for p in points], "lng": [float(p.longitude) for p in points],
         "gps_valid": [1.0] * n,
     }
     for c in ("roll", "pitch", "yaw", "ax", "ay", "az", "wx", "wy", "wz"):
@@ -201,7 +310,7 @@ class PredictResponse(BaseModel):
 
 
 app = FastAPI(title="ICCAS AI Predict Server")
-fall_predictor: Optional[BinaryPredictor] = None
+fall_predictor = None
 wander_predictor: Optional[BinaryPredictor] = None
 
 
@@ -210,7 +319,7 @@ def _load_models() -> None:
     global fall_predictor, wander_predictor
     # 컨테이너별로 자기 역할 모델만 로드한다(2컨테이너 분리). 빈 경로면 그 역할은 비트리거.
     if FALL_MODEL_PATH:
-        fall_predictor = BinaryPredictor(FALL_MODEL_PATH)
+        fall_predictor = build_fall_predictor(FALL_MODEL_PATH)
     else:
         logger.info("낙상 모델 미설정 → 낙상 비트리거")
     if WANDER_MODEL_PATH:
@@ -221,21 +330,22 @@ def _load_models() -> None:
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "fall_model": bool(fall_predictor), "wander_model": bool(wander_predictor)}
+    return {
+        "status": "ok",
+        "fall_model": type(fall_predictor).__name__ if fall_predictor else None,
+        "wander_model": bool(wander_predictor),
+    }
 
 
 def _detect_fall(req: PredictRequest) -> DetectionResult:
     if fall_predictor is None or req.imuData is None:
         return DetectionResult(is_triggered=False, probability=0.0)
     n = len(req.imuData.ax)
-    # 회전반경 시퀀스 최소 길이 미만이면 판단 불가 → 비트리거
     if n < fall_predictor.sequence_length:
         logger.info("IMU 표본 부족 personId=%s n=%d (<%d)", req.personId, n, fall_predictor.sequence_length)
         return DetectionResult(is_triggered=False, probability=0.0)
     try:
-        frame = _imu_to_frame(req.imuData, n)
-        featured, _, _ = build_features(frame, origin_lat=0.0, origin_lng=0.0)
-        prob = fall_predictor._score(featured)
+        prob = fall_predictor.predict_fall(req.imuData)
     except Exception as exc:  # noqa: BLE001
         logger.exception("낙상 추론 실패 personId=%s: %s", req.personId, exc)
         return DetectionResult(is_triggered=False, probability=0.0)

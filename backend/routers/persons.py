@@ -182,6 +182,7 @@ async def get_person_location_history(
     person_id: int,
     from_time: datetime = Query(..., alias="from", description="조회 시작 시간"),
     to_time: datetime = Query(..., alias="to", description="조회 종료 시간"),
+    limit: int = Query(5000, ge=1, le=20000, description="반환 상한(초과 시 최신순으로 잘림)"),
     current_guardian: Guardian = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -195,18 +196,26 @@ async def get_person_location_history(
     to_time = to_naive_utc(to_time)
 
     # 2. DB에서 기간 내 위치 로그 조회
-    stmt = select(GpsLog.latitude, GpsLog.longitude).where(
-        GpsLog.person_id == person_id,
-        GpsLog.created_at >= from_time,
-        GpsLog.created_at <= to_time
+    #  - created_at 정렬을 명시(정렬 미지정 시 순서 보장 안 됨 → 경로선 뒤섞임 방지)
+    #  - DATETIME(6) 이후 표본 폭증에 대비해 limit 상한. 최신순으로 상한만큼 가져와,
+    #    초과 시 오래된 점부터 버리고, 응답은 시간 오름차순으로 되돌린다.
+    stmt = (
+        select(GpsLog.latitude, GpsLog.longitude)
+        .where(
+            GpsLog.person_id == person_id,
+            GpsLog.created_at >= from_time,
+            GpsLog.created_at <= to_time,
+        )
+        .order_by(GpsLog.created_at.desc())
+        .limit(limit)
     )
 
-    # 위치 데이터 리스트
-    history_data = (await db.execute(stmt)).all()
+    # 위치 데이터 리스트 (최신→과거로 왔으므로 경로선용 오름차순으로 뒤집는다)
+    history_data = list(reversed((await db.execute(stmt)).all()))
 
     if not history_data:
         return {"history": []}
-    
+
     formatted_history = [
         LocationAbstractResponse(
             latitude=item[0],

@@ -1,4 +1,4 @@
-# ICCAS AI 모델 배포 패키지
+# ICCAS AI 모델 배포 패키지 final-tcn-server 여기입니다 여기!
 
 GPS, IMU 데이터를 사용해 LSTM 기반으로 실시간 배회감지와 낙상감지를 수행하는 AI 모델 패키지입니다. 팀원이 Git에서 받을 때 원본 엑셀 데이터나 실행 결과 파일 없이, AI 코드와 학습 완료 모델만 사용할 수 있도록 구성했습니다.
 
@@ -36,6 +36,8 @@ ai-model-release/
   models/iccas_lstm_v1_imu_fall.json
   models/iccas_sisfall_lstm_imu_fall.pt
   models/iccas_sisfall_lstm_imu_fall.json
+  models/iccas_final_hybrid_lstm_imu_fall.pt
+  models/iccas_final_hybrid_lstm_imu_fall.json
 ```
 
 Git에 올리지 않는 파일은 원본 학습 데이터, 테스트 결과, 캐시 파일입니다.
@@ -62,11 +64,6 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-가상환경에서 나가려면 아래 명령어를 사용합니다.
-
-```bash
-deactivate
-```
 
 ## 엑셀/CSV 데이터 형식
 
@@ -96,13 +93,29 @@ python scripts/realtime_sensor_lstm.py inspect \
 
 ## 이미 학습된 모델로 시뮬레이션
 
+IMU 낙상 감지의 최종 권장 모델은 아래 파일입니다.
+
+```text
+models/iccas_final_hybrid_lstm_imu_fall.pt
+models/iccas_final_hybrid_lstm_imu_fall.json
+```
+
+이름에는 과거 실험명으로 `hybrid`가 남아 있지만, 최종 선택된 가중치는 LSTM 중심입니다. 실제 서비스/데모에서는 Accuracy만 높은 모델보다 Recall과 F1-score가 높은 이 모델을 사용합니다.
+
+```text
+Accuracy  : 0.8799
+Precision : 0.8498
+Recall    : 0.8863
+F1-score  : 0.8677
+```
+
 백엔드 없이 로컬에서 추론 결과 CSV만 만들려면 아래처럼 실행합니다.
 
 ```bash
 python scripts/realtime_sensor_lstm.py replay \
   --source ../ICCAS_total_data_with_fall.xlsx \
   --sheet data \
-  --model models/iccas_sensor_lstm_fall.pt \
+  --model models/iccas_final_hybrid_lstm_imu_fall.pt \
   --output outputs/replay_results.csv \
   --device cpu \
   --print-events
@@ -158,7 +171,7 @@ source .venv/bin/activate
 python scripts/realtime_sensor_lstm.py replay \
   --source ../ICCAS_total_data_with_fall.xlsx \
   --sheet data \
-  --model models/iccas_sensor_lstm_fall.pt \
+  --model models/iccas_final_hybrid_lstm_imu_fall.pt \
   --backend-url http://127.0.0.1:8000/api/sensor-result \
   --output outputs/backend_replay_results.csv \
   --sleep 0.05 \
@@ -182,7 +195,7 @@ http://127.0.0.1:8000/api/sensor-result/history?limit=5000
 
 ```bash
 python scripts/realtime_sensor_lstm.py live \
-  --model models/iccas_sensor_lstm_fall.pt \
+  --model models/iccas_final_hybrid_lstm_imu_fall.pt \
   --backend-url http://127.0.0.1:8000/api/sensor-result \
   --device cpu
 ```
@@ -191,6 +204,64 @@ python scripts/realtime_sensor_lstm.py live \
 
 ```json
 {"server_time":"2026-07-01 11:35:56.764000","device":"esp32-1","lat":36.621853,"lng":127.426337,"roll":-12.1,"pitch":9.7,"yaw":8.8,"ax":3.2,"ay":-2.6,"az":4.1,"wx":320.0,"wy":-280.0,"wz":220.0}
+```
+
+## LSTM 전 초기 궤적 알고리즘 데모
+
+LSTM은 일정 길이의 시퀀스가 쌓인 뒤 추론할 수 있습니다. 그 전에는 Martino-Saltzman 기반 규칙 알고리즘으로 Direct, Pacing, Lapping, Random을 먼저 분류할 수 있습니다.
+
+```bash
+python scripts/trajectory_pattern_demo.py \
+  --sample pacing \
+  --model models/iccas_final_lstm_gps_wandering.pt \
+  --output ../data/iccas_sensor_lstm/trajectory_pattern_demo_pacing.json \
+  --device cpu
+```
+
+데모 흐름:
+
+```text
+index 8  -> LSTM ready=false, algorithm=Pacing, final=early_pattern_warning
+index 16 -> LSTM ready=true,  algorithm=Pacing, final=wandering
+```
+
+사용자 GPS JSON 파일을 넣을 수도 있습니다.
+
+```bash
+python scripts/trajectory_pattern_demo.py \
+  --input user_gps_sequence.json \
+  --output trajectory_pattern_demo.json
+```
+
+## GPS Kalman + RTDM 하이브리드 탐지
+
+ GPS 좌표 튐을 줄이기 위해 Kalman filter를 먼저 적용하고, NicklasXYZ/rtdm의 경로 토큰 시퀀스 기반 support score 아이디어를 RNN 배회 점수와 결합할 수 있습니다.
+
+주의: 현재 코드는 NicklasXYZ/rtdm 원본 패키지를 그대로 이식한 것이 아니라, 원본의 token sequence support 개념을 참고해 `x_m`, `y_m` 기반 meter-grid token으로 재구현한 lightweight 버전입니다.
+
+```bash
+python scripts/compare_gps_kalman_rnn.py \
+  --source ../ICCAS_final_data.xlsx \
+  --epochs 15 \
+  --batch-size 256 \
+  --device auto
+```
+
+RTDM 하이브리드까지 포함해 학습/평가하려면 아래 명령어를 사용합니다.
+
+```bash
+python scripts/train_rtdm_gps_hybrid.py \
+  --source ../ICCAS_final_data.xlsx \
+  --epochs 15 \
+  --batch-size 256 \
+  --device auto
+```
+
+결과 보고서는 아래 파일에서 확인합니다.
+
+```text
+docs/GPS_KALMAN_RNN_COMPARISON.md
+docs/GPS_RTDM_HYBRID_REPORT.md
 ```
 
 ## 재학습 방법
@@ -392,6 +463,7 @@ IMU 낙상 감지:
   models/iccas_final_sisfall_lstm_imu_fall.pt
   models/iccas_final_sisfall_lstm_imu_fall.json
   docs/FINAL_DATA_TRAINING_REPORT.md
+  docs/PRESENTATION_MATERIAL.md
   assets/final_model_performance_dashboard.png
   assets/final_model_performance_dashboard.svg
   assets/final_model_performance_summary.csv
@@ -414,6 +486,55 @@ Accuracy 0.8814, Precision 0.8879, Recall 0.8392, F1 0.8629
 
 ```text
 data/iccas_sensor_lstm/FINAL_DATA_TRAINING_REPORT.md
+```
+
+발표 자료:
+
+```text
+docs/PRESENTATION_MATERIAL.md
+```
+
+RNN, GRU, LSTM, Transformer 비교 분석 자료:
+
+```text
+docs/MODEL_COMPARISON_ANALYSIS.md
+```
+
+RNN, GRU, LSTM, Transformer 실제 학습 비교 결과:
+
+```text
+docs/MODEL_ARCHITECTURE_COMPARISON_RESULTS.md
+```
+
+IMU 낙상 감지 F1-score 보정 방안:
+
+```text
+docs/FALL_DETECTION_ALGORITHM_CORRECTION.md
+```
+
+최종 구조, GPS RNN + IMU Fall LSTM 및 전처리 설명:
+
+```text
+docs/FINAL_GPS_RNN_IMU_LSTM_SYSTEM.md
+```
+
+IMU 전처리 CSV 생성:
+
+```bash
+../.venv/bin/python scripts/export_imu_preprocessed_csv.py \
+  --source ../data/iccas_sensor_lstm/final_iccas_sisfall_imu_merged.csv \
+  --output ../data/iccas_sensor_lstm/imu_fall_preprocessed.csv \
+  --summary ../data/iccas_sensor_lstm/imu_fall_preprocessed_summary.json
+```
+
+GPS RNN 재학습:
+
+```bash
+../.venv/bin/python scripts/train_gps_rnn_wandering.py \
+  --source ../ICCAS_final_data.xlsx \
+  --epochs 15 \
+  --batch-size 256 \
+  --device auto
 ```
 
 성능 시각화:

@@ -21,6 +21,8 @@ class TrackedPerson(Base, TimestampMixin):
     )
     name: Mapped[str] = mapped_column(String(50), nullable=False)
     age: Mapped[int] = mapped_column(Integer, nullable=False)
+    # 환자 전화번호(선택) — 대시보드에서 tel: 다이얼러용. 앱에서 전화 앱 실행 처리.
+    phone_number: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     device_id: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
     device_token: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False)

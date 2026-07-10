@@ -54,6 +54,7 @@ async def register_person(
         guardian_id=current_guardian.id,
         name=payload.name,
         age=payload.age,
+        phone_number=payload.phone_number,
         device_id=new_device_id,
         device_token=payload.device_token,
         is_active=True

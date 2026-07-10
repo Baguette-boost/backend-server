@@ -45,14 +45,36 @@ services:
       baguetteboost-db:
         condition: service_healthy
 
-  baguetteboost-ai:
+  # 낙상 전용 추론 컨테이너 (BinaryLSTM, iccas_final_lstm_imu_fall.pt)
+  baguetteboost-ai-fall:
     build:
       # 컨텍스트는 repo 루트: ai-serve(우리 서버) + ai-model-release(팀원 원본 모델/스크립트) 둘 다 접근
       context: .
       dockerfile: ai-serve/Dockerfile
     environment:
-      - TZ=UTC       # AI 가 보내는 시각도 UTC 로 통일 (서버 전역 UTC 규약)
-    container_name: baguetteboost-ai
+      - TZ=UTC
+      - FALL_MODEL_PATH=models/iccas_final_lstm_imu_fall.pt
+      - WANDER_MODEL_PATH=            # 비움 → 배회 미로드(낙상 전용)
+    container_name: baguetteboost-ai-fall
+    restart: unless-stopped
+    env_file:
+      - .env
+    networks:
+      - baguetteboost-network
+    depends_on:
+      baguetteboost-backend:
+        condition: service_started
+
+  # 배회 전용 추론 컨테이너 (BinaryLSTM, iccas_final_lstm_gps_wandering.pt)
+  baguetteboost-ai-wander:
+    build:
+      context: .
+      dockerfile: ai-serve/Dockerfile
+    environment:
+      - TZ=UTC
+      - FALL_MODEL_PATH=             # 비움 → 낙상 미로드(배회 전용)
+      - WANDER_MODEL_PATH=models/iccas_final_lstm_gps_wandering.pt
+    container_name: baguetteboost-ai-wander
     restart: unless-stopped
     env_file:
       - .env

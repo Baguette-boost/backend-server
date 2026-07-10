@@ -137,6 +137,32 @@ def _imu_to_frame(imu: "ImuData", n: int) -> pd.DataFrame:
     return pd.DataFrame(data)
 
 
+def _gps_to_frame(points: list) -> pd.DataFrame:
+    """GPS 궤적을 build_features 가 먹는 DataFrame 으로 재구성(배회 피처용).
+
+    x_m/y_m 는 origin(원점) 기준 절대 위치인데 체크포인트에 origin 이 없어,
+    build_features(origin=None) 로 '배치 GPS 중앙값'을 원점으로 근사한다.
+    (이동 피처 dx_m/dy_m/speed_mps/dt_s/gps_valid 는 원점과 무관하게 정확)
+    낙상 피처가 아니므로 IMU 컬럼은 더미(0)로 채운다(build_features 가 참조만 하고 배회 피처엔 미포함).
+    """
+    n = len(points)
+    times = [pd.to_datetime(p.timestamp, errors="coerce") if p.timestamp else pd.NaT for p in points]
+    server_time = pd.Series(times)
+    if server_time.isna().any():
+        base = pd.Timestamp("2000-01-01")
+        server_time = pd.Series(base + pd.to_timedelta(np.arange(n), unit="s"))
+    data = {
+        "device": ["0"] * n,
+        "server_time": server_time,
+        "lat": [float(p.latitude) for p in points],
+        "lng": [float(p.longitude) for p in points],
+        "gps_valid": [1.0] * n,
+    }
+    for c in ("roll", "pitch", "yaw", "ax", "ay", "az", "wx", "wy", "wz"):
+        data[c] = [0.0] * n
+    return pd.DataFrame(data)
+
+
 # --- 요청/응답 스키마 (backend/schemas/ai.py 와 일치) ---
 class ImuData(BaseModel):
     roll: List[float] = []
@@ -182,11 +208,15 @@ wander_predictor: Optional[BinaryPredictor] = None
 @app.on_event("startup")
 def _load_models() -> None:
     global fall_predictor, wander_predictor
-    fall_predictor = BinaryPredictor(FALL_MODEL_PATH)
+    # 컨테이너별로 자기 역할 모델만 로드한다(2컨테이너 분리). 빈 경로면 그 역할은 비트리거.
+    if FALL_MODEL_PATH:
+        fall_predictor = BinaryPredictor(FALL_MODEL_PATH)
+    else:
+        logger.info("낙상 모델 미설정 → 낙상 비트리거")
     if WANDER_MODEL_PATH:
         wander_predictor = BinaryPredictor(WANDER_MODEL_PATH)
     else:
-        logger.info("배회 모델 미설정 → stub(비트리거)로 동작")
+        logger.info("배회 모델 미설정 → 배회 비트리거")
 
 
 @app.get("/health")
@@ -215,8 +245,21 @@ def _detect_fall(req: PredictRequest) -> DetectionResult:
 
 
 def _detect_wandering(req: PredictRequest) -> DetectionResult:
-    # 배회 모델 미확정 → stub. (WANDER_MODEL_PATH 설정 시 낙상과 동일 경로로 확장 예정)
-    return DetectionResult(is_triggered=False, probability=0.0)
+    if wander_predictor is None or not req.gpsData:
+        return DetectionResult(is_triggered=False, probability=0.0)
+    pts = [p for p in req.gpsData if p.latitude is not None and p.longitude is not None]
+    if len(pts) < wander_predictor.sequence_length:
+        return DetectionResult(is_triggered=False, probability=0.0)
+    try:
+        frame = _gps_to_frame(pts)
+        featured, _, _ = build_features(frame, origin_lat=None, origin_lng=None)
+        prob = wander_predictor._score(featured)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("배회 추론 실패 personId=%s: %s", req.personId, exc)
+        return DetectionResult(is_triggered=False, probability=0.0)
+    if prob is None:
+        return DetectionResult(is_triggered=False, probability=0.0)
+    return DetectionResult(is_triggered=prob >= wander_predictor.threshold, probability=round(prob, 4))
 
 
 @app.post("/predict", response_model=PredictResponse)

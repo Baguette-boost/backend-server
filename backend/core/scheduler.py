@@ -54,7 +54,7 @@ async def monitor_device_heartbeats():
             # 상태 변경
             person.is_active = False
 
-            alert_msg = f"[경고] {person.name} 어르신의 단말기 통신이 {TIMEOUT_MINUTES}분 이상 두절되었습니다. 전원 상태를 확인하세요."
+            alert_msg = f"[Warning] {person.name}'s device has been offline for more than {TIMEOUT_MINUTES} minutes. Please check the power."
             
             # 오프라인 로그 생성
             alert_log = AlertLog(

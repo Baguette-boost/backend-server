@@ -160,7 +160,7 @@ async def process_fall_suspect(person_id: int, recorded_at, imu_dict: dict, samp
                     db.add(AlertLog(
                         person_id=person_id,
                         alert_type="fall_detected",
-                        message=f"{name}님의 낙상이 감지되었습니다",
+                        message=f"Fall detected for {name}.",
                         created_at=utcnow(),
                     ))
 
@@ -170,7 +170,7 @@ async def process_fall_suspect(person_id: int, recorded_at, imu_dict: dict, samp
     # 새 낙상 에피소드가 시작된 경우에만 실시간 알림 1회 (WebSocket + Expo Push)
     if predicted and newly_started and guardian_id:
         await NotificationService._notify(
-            person_id, guardian_id, "fall_detected", f"{name}님의 낙상이 감지되었습니다"
+            person_id, guardian_id, "fall_detected", f"Fall detected for {name}."
         )
 
 # API Endpoints

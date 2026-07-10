@@ -45,18 +45,18 @@ async def send_emergency_push(expo_token: str, elder_name: str, alert_type: str)
     
     # 알림 타입에 따른 메시지 분기 (wandering / fall_detected / offline)
     if alert_type == "fall_detected":
-        body_msg = "낙상이 감지되었습니다. 즉시 확인해주세요!"
+        body_msg = "A fall has been detected. Please check immediately!"
     elif alert_type == "wandering":
-        body_msg = "배회가 감지되었습니다. 확인해주세요."
+        body_msg = "Wandering has been detected. Please check."
     elif alert_type == "offline":
-        body_msg = "기기가 오프라인 상태입니다. 전원을 확인해주세요."
+        body_msg = "The device is offline. Please check the power."
     else:
-        body_msg = "긴급 상황이 감지되었습니다."
+        body_msg = "An emergency has been detected."
 
     payload = {
         "to": expo_token,
         "sound": "default",
-        "title": f"🚨 긴급 알림: {elder_name} 어르신",
+        "title": f"🚨 Emergency Alert: {elder_name}",
         "body": body_msg,
         "priority": "high",
         "data": {"screen": "EmergencyMap", "alert_type": alert_type}
@@ -121,7 +121,7 @@ class NotificationService:
                     sess.add(AlertLog(
                         person_id=int(person_id),
                         alert_type="wandering",
-                        message=f"{name}님의 배회가 감지되었습니다",
+                        message=f"Wandering detected for {name}.",
                         created_at=utcnow(),
                     ))
                     await sess.commit()
@@ -134,7 +134,7 @@ class NotificationService:
 
             # 최초 배회 감지 → 알림 1회 (WebSocket + Expo Push)
             await NotificationService._notify(
-                person_id, guardian_id, "wandering", f"{name}님의 배회가 감지되었습니다"
+                person_id, guardian_id, "wandering", f"Wandering detected for {name}."
             )
             return
         else:
@@ -222,14 +222,14 @@ class NotificationService:
 
         alert_type = extra_data.get("type") if extra_data else None
 
-        title, body = "알림", "새로운 상태 업데이트가 있습니다."
+        title, body = "Notification", "You have a new status update."
 
         if alert_type == 'wandering':
-            title, body = "🚨 배회 감지", "배회가 감지되었습니다"
+            title, body = "🚨 Wandering Detected", "Wandering has been detected."
         elif alert_type == 'fall_detected':
-            title, body = "🚨 위험 상황 발생", "낙상이 감지되었습니다"
+            title, body = "🚨 Emergency: Fall Detected", "A fall has been detected."
         elif alert_type == 'offline':
-            title, body = "🚨 오프라인", "기기가 오프라인 상태입니다"
+            title, body = "🚨 Device Offline", "The device is offline."
 
         try:
             # Expo 푸시 메시지 객체 생성

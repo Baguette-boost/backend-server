@@ -21,7 +21,7 @@ TIMEOUT_MINUTES = 5 # 오프라인 판정 임계치 (5분)
 
 # 낙상 후 부동(이동 없음) 판정 파라미터 (실외 낙상 대상, GPS 궤적 분산 기반)
 FALL_EPISODE_MINUTES = 10   # 마지막 낙상 판정 후 이 시간 동안 추가 낙상이 없으면 종료 판정(기준: https://www.movementdisordersclinic.com/how-to-safely-get-up-after-a-fall-a-guide-for-seniors/)
-FALL_MIN_VALID_POINTS = 5   # 회전반경 계산에 필요한 최소 유효 GPS 점 수 (미만이면 판단 불가)
+FALL_MIN_VALID_POINTS = 10  # 회전반경 계산에 필요한 최소 유효 GPS 점 수 (미만이면 판단 불가) — Rg 안정성 위해 상향
 FALL_RG_THRESHOLD_M = 20.0  # 회전반경이 이 값 이하이면 '아직 부동' → is_fall 유지
 
 # 배회 감지는 GPS 수신 경로(receive_gps → broadcast_event)에서 매 핑마다 처리하므로

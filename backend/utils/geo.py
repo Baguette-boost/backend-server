@@ -10,7 +10,8 @@ from typing import List, Optional, Tuple
 EARTH_RADIUS_M = 6371000.0
 
 # 사람이 낼 수 있는 현실적 상한 속도(m/s). 이보다 빠른 연속 이동은 GPS 스파이크로 간주.
-MAX_HUMAN_SPEED_MPS = 5.0
+# 보행 상단(~1.6m/s) 위에 헤드룸을 둔 글리치 필터 문턱(부축·빠른걸음·지터 흡수).
+MAX_HUMAN_SPEED_MPS = 3.0
 
 
 def haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:

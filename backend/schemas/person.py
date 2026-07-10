@@ -44,6 +44,11 @@ class LocationAbstractResponse(BaseModel):
 class LocationResponse(LocationAbstractResponse):
     is_fall: bool
     is_wandering: bool
-    
+
+# 지도 경로선 위의 지점별 이벤트(낙상/배회) 표시용
+class LocationHistoryPoint(LocationAbstractResponse):
+    is_fall_detected: bool = False
+    is_wandering_detected: bool = False
+
 class LocationHistoryResponse(BaseModel):
-    history: List[LocationAbstractResponse]
+    history: List[LocationHistoryPoint]

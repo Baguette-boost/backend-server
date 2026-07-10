@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 import asyncio
 
 # 내부 모듈 임포트 (경로는 프로젝트 환경에 맞게 수정)
-from backend.schemas.person import PersonCreate, PersonUpdate, PersonResponse, LocationAbstractResponse, LocationResponse, LocationHistoryResponse, DeviceVerifyRequest
+from backend.schemas.person import PersonCreate, PersonUpdate, PersonResponse, LocationAbstractResponse, LocationResponse, LocationHistoryResponse, LocationHistoryPoint, DeviceVerifyRequest
 from backend.core.security import get_current_user, verify_device_by_token
 
 from backend.database import get_db, get_independent_session
@@ -200,7 +200,12 @@ async def get_person_location_history(
     #  - DATETIME(6) 이후 표본 폭증에 대비해 limit 상한. 최신순으로 상한만큼 가져와,
     #    초과 시 오래된 점부터 버리고, 응답은 시간 오름차순으로 되돌린다.
     stmt = (
-        select(GpsLog.latitude, GpsLog.longitude)
+        select(
+            GpsLog.latitude,
+            GpsLog.longitude,
+            GpsLog.is_fall_detected,
+            GpsLog.is_wandering_detected,
+        )
         .where(
             GpsLog.person_id == person_id,
             GpsLog.created_at >= from_time,
@@ -217,9 +222,11 @@ async def get_person_location_history(
         return {"history": []}
 
     formatted_history = [
-        LocationAbstractResponse(
+        LocationHistoryPoint(
             latitude=item[0],
-            longitude=item[1]
+            longitude=item[1],
+            is_fall_detected=item[2],
+            is_wandering_detected=item[3],
         )
         for item in history_data
     ]

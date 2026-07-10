@@ -139,6 +139,24 @@ async def process_fall_suspect(person_id: int, recorded_at, imu_dict: dict, samp
                 # 이력 저장: _notify 는 실시간(WS+Push) 전용이므로 호출부에서 alert_logs 를 남긴다.
                 # 에피소드당 1회만 기록해 같은 낙상의 반복 알림을 억제한다.
                 if newly_started:
+                    # 지도 지점별 표시용: 낙상은 IMU 경로라 자체 lat/lng 이 없으므로,
+                    # recorded_at 직전(없으면 직후) 마지막 위치 gps_log 에 낙상 플래그를 남긴다.
+                    fall_gps = (await db.execute(
+                        select(GpsLog).where(
+                            GpsLog.person_id == person_id,
+                            GpsLog.created_at <= recorded_at,
+                        ).order_by(GpsLog.created_at.desc()).limit(1)
+                    )).scalar_one_or_none()
+                    if fall_gps is None:
+                        fall_gps = (await db.execute(
+                            select(GpsLog).where(
+                                GpsLog.person_id == person_id,
+                                GpsLog.created_at > recorded_at,
+                            ).order_by(GpsLog.created_at.asc()).limit(1)
+                        )).scalar_one_or_none()
+                    if fall_gps is not None:
+                        fall_gps.is_fall_detected = True
+
                     db.add(AlertLog(
                         person_id=person_id,
                         alert_type="fall_detected",

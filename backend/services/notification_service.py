@@ -13,6 +13,7 @@ from backend.database import get_db, get_independent_session
 from backend.models.guardian import Guardian
 from backend.models.person import TrackedPerson
 from backend.models.alert import AlertLog
+from backend.models.telemetry import GpsLog
 from backend.schemas.ai import AIPredictRequest
 from backend.services.ai_client import ai_client
 from backend.utils.time import utcnow, isoformat_utc
@@ -107,6 +108,15 @@ class NotificationService:
                     person.is_wandering = True
                     guardian_id = person.guardian_id
                     name = person.name
+                    # 지도 지점별 표시용: 배회 감지 순간의 최신 gps_log 에 플래그
+                    latest_gps = (await sess.execute(
+                        select(GpsLog)
+                        .where(GpsLog.person_id == int(person_id))
+                        .order_by(GpsLog.created_at.desc())
+                        .limit(1)
+                    )).scalar_one_or_none()
+                    if latest_gps is not None:
+                        latest_gps.is_wandering_detected = True
                     # 이력 저장: _notify 는 실시간(WS+Push) 전용이므로 호출부에서 alert_logs 를 남긴다.
                     sess.add(AlertLog(
                         person_id=int(person_id),

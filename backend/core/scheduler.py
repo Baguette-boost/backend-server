@@ -1,4 +1,5 @@
 import logging
+import math
 from datetime import datetime, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import select
@@ -7,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.database import get_independent_session
 from backend.models.person import TrackedPerson
 from backend.models.alert import AlertLog
-from backend.models.telemetry import GpsLog
+from backend.models.telemetry import GpsLog, ImuLog
 from backend.services.notification_service import NotificationService, get_guardian_token_and_name, send_emergency_push
 from backend.utils.time import utcnow
 from backend.utils.geo import clean_track, radius_of_gyration_m
@@ -23,6 +24,13 @@ TIMEOUT_MINUTES = 5 # 오프라인 판정 임계치 (5분)
 FALL_EPISODE_MINUTES = 10   # 마지막 낙상 판정 후 이 시간 동안 추가 낙상이 없으면 종료 판정(기준: https://www.movementdisordersclinic.com/how-to-safely-get-up-after-a-fall-a-guide-for-seniors/)
 FALL_MIN_VALID_POINTS = 10  # 회전반경 계산에 필요한 최소 유효 GPS 점 수 (미만이면 판단 불가) — Rg 안정성 위해 상향
 FALL_RG_THRESHOLD_M = 20.0  # 회전반경이 이 값 이하이면 '아직 부동' → is_fall 유지
+
+# IMU 정지판정 파라미터 (야외: 낙상은 IMU 가 직접 신호 + GPS 드롭 대비. 최근 IMU 로 활동/정지 구분)
+FALL_IMU_LOOKBACK_MINUTES = 3   # 최근 몇 분의 imu_logs 로 현재 활동 상태를 볼지
+FALL_IMU_MAX_LOGS = 30          # 조회할 최근 imu_logs 최대 개수(성능 상한)
+FALL_IMU_MIN_SAMPLES = 50       # 판정에 필요한 최소 IMU 표본 수(미만이면 unknown)
+FALL_ACTIVE_ACCEL_STD = 0.08    # accel_norm 표준편차(g) 이 이상이면 '활동' (임시값 — 실데이터 보정 필요)
+FALL_ACTIVE_GYRO_MEAN = 20.0    # gyro_norm 평균(deg/s) 이 이상이면 '활동' (임시값 — 실데이터 보정 필요)
 
 # 배회 감지는 GPS 수신 경로(receive_gps → broadcast_event)에서 매 핑마다 처리하므로
 # 별도 스케줄러 잡(check_wandering_job)은 제거되었다.
@@ -87,13 +95,59 @@ async def monitor_device_heartbeats():
         
         await db.commit()
 
+def _std(values: list) -> float:
+    n = len(values)
+    if n == 0:
+        return 0.0
+    mean = sum(values) / n
+    return math.sqrt(sum((v - mean) ** 2 for v in values) / n)
+
+
+async def _imu_motion_state(db, person_id: int, now) -> str:
+    """최근 IMU 로 활동/정지 상태를 판정한다. return: 'active' | 'still' | 'unknown'.
+
+    낙상은 IMU 가 직접 신호이고, 야외에서 GPS 가 드롭돼도 판단 가능한 회복 신호.
+    accel_norm 변동(std)이 크거나 gyro_norm 평균이 크면 '활동'(회복),
+    둘 다 작으면 '정지'(여전히 쓰러짐). 표본이 부족하면 'unknown'.
+    """
+    since = now - timedelta(minutes=FALL_IMU_LOOKBACK_MINUTES)
+    stmt = (
+        select(ImuLog.imu_data)
+        .where(
+            ImuLog.person_id == person_id,
+            ImuLog.recorded_at >= since,
+            ImuLog.recorded_at <= now,
+        )
+        .order_by(ImuLog.recorded_at.desc())
+        .limit(FALL_IMU_MAX_LOGS)
+    )
+    logs = (await db.execute(stmt)).scalars().all()
+    accel_norms: list = []
+    gyro_norms: list = []
+    for d in logs:
+        if not d:
+            continue
+        ax, ay, az = d.get("ax", []), d.get("ay", []), d.get("az", [])
+        wx, wy, wz = d.get("wx", []), d.get("wy", []), d.get("wz", [])
+        for i in range(min(len(ax), len(ay), len(az), len(wx), len(wy), len(wz))):
+            accel_norms.append(math.sqrt(ax[i] ** 2 + ay[i] ** 2 + az[i] ** 2))
+            gyro_norms.append(math.sqrt(wx[i] ** 2 + wy[i] ** 2 + wz[i] ** 2))
+    if len(accel_norms) < FALL_IMU_MIN_SAMPLES:
+        return "unknown"
+    if _std(accel_norms) >= FALL_ACTIVE_ACCEL_STD or (sum(gyro_norms) / len(gyro_norms)) >= FALL_ACTIVE_GYRO_MEAN:
+        return "active"
+    return "still"
+
+
 async def monitor_fall_episodes():
     """
-    낙상 후 부동(이동 없음) 판정 루프.
-    마지막 낙상 판정 후 FALL_EPISODE_MINUTES 동안 추가 낙상이 없으면,
-    에피소드 윈도우 내 GPS 궤적의 회전반경으로 is_fall(여전히 쓰러짐)을 유지/해제한다.
-    실외 낙상 대상 — 유효 GPS 가 부족하면 판단 불가로 보고 is_fall 을 해제한다.
-    (최초 낙상 알림은 감지 시점에 이미 발송되었으므로, 여기서 해제는 '상태' 종료를 의미)
+    낙상 후 회복/부동 판정 루프(야외 대상). 마지막 낙상 판정 후 FALL_EPISODE_MINUTES 동안 추가 낙상이 없으면 평가.
+    회복은 IMU 활동(낙상은 IMU 가 직접 신호) 또는 GPS 이동(에피소드 동안 벗어남) 중 하나만 있어도 인정한다.
+    GPS 는 야외에서 드롭될 수 있어 IMU 가 상호 보완한다.
+      - 회복(IMU 활동 or GPS 이동) → is_fall 해제 + 에피소드 종료
+      - 부동(이동 신호 없음)       → is_fall 유지 + 에피소드 열어둬 계속 감시(회복 시 자동 해제 → 고착 방지)
+      - 판단 불가(IMU·GPS 모두 신호 없음) → 보류(다음 주기 재평가)
+    (최초 낙상 알림은 감지 시점에 이미 발송됨 — 여기서는 '상태' 관리만 한다)
     """
     async with get_independent_session() as db:
         now = utcnow()
@@ -108,7 +162,10 @@ async def monitor_fall_episodes():
             return
 
         for person in persons:
-            # 에피소드 윈도우 [fall_started_at, now] 내 GPS 조회 (시간 오름차순)
+            # 1) IMU 정지판정 (낙상은 IMU 가 직접 신호 — 회복/부동 판단)
+            imu_state = await _imu_motion_state(db, person.id, now)
+
+            # 2) GPS 회전반경 (에피소드 동안 벗어났는지 — 야외 드롭 시 IMU 로 보완): 윈도우 [fall_started_at, now]
             gstmt = (
                 select(GpsLog.latitude, GpsLog.longitude, GpsLog.created_at)
                 .where(
@@ -119,27 +176,28 @@ async def monitor_fall_episodes():
                 .order_by(GpsLog.created_at)
             )
             rows = (await db.execute(gstmt)).all()
-
-            # (0,0)·None 제거 + 속도 이상치 제거
             points = clean_track([(r[0], r[1], r[2]) for r in rows])
+            gps_ok = len(points) >= FALL_MIN_VALID_POINTS
+            rg = radius_of_gyration_m(points) if gps_ok else None
+            rg_str = f"{rg:.1f}m" if rg is not None else "n/a"
 
-            if len(points) < FALL_MIN_VALID_POINTS:
-                # 유효 GPS 부족 → 회복 판단 불가. '해제'하지 않고 '보류'한다:
-                # is_fall·fall_pending 을 그대로 두어 다음 주기에 GPS 가 더 쌓이면 재평가.
-                # 실내/저품질 GPS 낙상자를 잘못 해제하지 않기 위함(회복은 양성 이동 신호가 있을 때만 인정).
-                logger.info(f"[FALL-EPISODE] personId={person.id} 유효 GPS 부족({len(points)}) → 판정 보류(is_fall 유지)")
-                continue
+            # 회복: IMU 활동 OR GPS 이동 — 둘 중 하나만 있어도 인정
+            #   (IMU 최근창은 '지금 정지'만 보므로, 걸어서 벗어난 뒤 앉은 경우를 GPS Rg 가 잡아준다)
+            # 부동: 이동 신호가 하나도 없음(IMU 정지 또는 GPS 정지)
+            moved = imu_state == "active" or (gps_ok and rg > FALL_RG_THRESHOLD_M)
+            still = imu_state == "still" or (gps_ok and rg <= FALL_RG_THRESHOLD_M)
 
-            rg = radius_of_gyration_m(points)
-            if rg <= FALL_RG_THRESHOLD_M:
-                person.is_fall = True  # 거의 이동 없음 → 여전히 쓰러짐 (유지)
-                logger.warning(f"[FALL-EPISODE] personId={person.id} 부동 지속 (Rg={rg:.1f}m) → is_fall 유지")
+            if moved:
+                person.is_fall = False
+                person.fall_pending = False  # 회복 → 에피소드 종료
+                logger.info(f"[FALL-EPISODE] personId={person.id} 회복 (imu={imu_state}, Rg={rg_str}) → is_fall 해제·에피소드 종료")
+            elif still:
+                person.is_fall = True        # 여전히 쓰러짐 → 유지
+                # 에피소드는 닫지 않고 계속 감시 → 회복 시 자동 해제(고착 방지)
+                logger.warning(f"[FALL-EPISODE] personId={person.id} 부동 지속 (imu={imu_state}, Rg={rg_str}) → is_fall 유지·감시 지속")
             else:
-                person.is_fall = False  # 이동 감지 → 회복
-                logger.info(f"[FALL-EPISODE] personId={person.id} 이동 감지 (Rg={rg:.1f}m) → is_fall 해제")
-
-            # 판정이 된 경우에만 에피소드 종료 (보류 시엔 열어둬 재평가)
-            person.fall_pending = False
+                # IMU 판단불가 & GPS 부족 → 판정 보류(다음 주기 재평가)
+                logger.info(f"[FALL-EPISODE] personId={person.id} 판정 보류 (imu={imu_state}, gps점={len(points)})")
 
         await db.commit()
 

@@ -124,19 +124,21 @@ async def monitor_fall_episodes():
             points = clean_track([(r[0], r[1], r[2]) for r in rows])
 
             if len(points) < FALL_MIN_VALID_POINTS:
-                # 유효 GPS 부족 → 실외 부동 판단 불가 → 비대상으로 보고 해제
-                person.is_fall = False
-                logger.info(f"[FALL-EPISODE] personId={person.id} 유효 GPS 부족({len(points)}) → is_fall 해제")
-            else:
-                rg = radius_of_gyration_m(points)
-                if rg <= FALL_RG_THRESHOLD_M:
-                    person.is_fall = True  # 거의 이동 없음 → 여전히 쓰러짐 (유지)
-                    logger.warning(f"[FALL-EPISODE] personId={person.id} 부동 지속 (Rg={rg:.1f}m) → is_fall 유지")
-                else:
-                    person.is_fall = False  # 이동 감지 → 회복
-                    logger.info(f"[FALL-EPISODE] personId={person.id} 이동 감지 (Rg={rg:.1f}m) → is_fall 해제")
+                # 유효 GPS 부족 → 회복 판단 불가. '해제'하지 않고 '보류'한다:
+                # is_fall·fall_pending 을 그대로 두어 다음 주기에 GPS 가 더 쌓이면 재평가.
+                # 실내/저품질 GPS 낙상자를 잘못 해제하지 않기 위함(회복은 양성 이동 신호가 있을 때만 인정).
+                logger.info(f"[FALL-EPISODE] personId={person.id} 유효 GPS 부족({len(points)}) → 판정 보류(is_fall 유지)")
+                continue
 
-            # 에피소드 종료
+            rg = radius_of_gyration_m(points)
+            if rg <= FALL_RG_THRESHOLD_M:
+                person.is_fall = True  # 거의 이동 없음 → 여전히 쓰러짐 (유지)
+                logger.warning(f"[FALL-EPISODE] personId={person.id} 부동 지속 (Rg={rg:.1f}m) → is_fall 유지")
+            else:
+                person.is_fall = False  # 이동 감지 → 회복
+                logger.info(f"[FALL-EPISODE] personId={person.id} 이동 감지 (Rg={rg:.1f}m) → is_fall 해제")
+
+            # 판정이 된 경우에만 에피소드 종료 (보류 시엔 열어둬 재평가)
             person.fall_pending = False
 
         await db.commit()

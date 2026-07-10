@@ -3,12 +3,13 @@ from typing import List
 from datetime import datetime
 import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, update
 from sqlalchemy.exc import IntegrityError
 import asyncio
 
 # 내부 모듈 임포트 (경로는 프로젝트 환경에 맞게 수정)
-from backend.schemas.person import PersonCreate, PersonUpdate, PersonResponse, LocationAbstractResponse, LocationResponse, LocationHistoryResponse, LocationHistoryPoint, DeviceVerifyRequest
+from backend.schemas.person import PersonCreate, PersonUpdate, PersonResponse, LocationAbstractResponse, LocationResponse, LocationHistoryResponse, LocationHistoryPoint, PersonStatusUpdate, PersonStatusResponse, DeviceVerifyRequest
+from backend.models.alert import AlertLog
 from backend.core.security import get_current_user, verify_device_by_token
 
 from backend.database import get_db, get_independent_session
@@ -113,6 +114,52 @@ async def update_person(
 
     for key, value in values.items():
         setattr(person, key, value)
+    await db.commit()
+    await db.refresh(person)
+    return person
+
+@person_router.patch("/{person_id}/status", response_model=PersonStatusResponse)
+async def normalize_person_status(
+    person_id: int,
+    payload: PersonStatusUpdate,
+    current_user: Annotated[Guardian, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db)
+):
+    """[대시보드] 낙상/배회 상태 수동 정상화(해제).
+
+    - 낙상 해제 시: is_fall=False + 에피소드 종료(fall_pending=False) — 스케줄러가 되돌리지 않도록.
+    - 배회 해제 시: is_wandering=False만 내린다(재알림 즉시 허용, 쿨다운 없음).
+    - 해제한 타입의 미읽음 alert_logs 를 read 처리한다.
+    """
+    person = await check_guardian_ownership(person_id, current_user.id, db)
+
+    if payload.is_fall is None and payload.is_wandering is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="변경할 상태가 없습니다.")
+
+    if payload.is_fall is not None:
+        person.is_fall = payload.is_fall
+        if payload.is_fall is False:
+            # 에피소드까지 종료해야 monitor_fall_episodes 가 정지 지속 시 다시 True 로 되돌리지 않는다.
+            person.fall_pending = False
+            await db.execute(
+                update(AlertLog).where(
+                    AlertLog.person_id == person_id,
+                    AlertLog.alert_type == "fall_detected",
+                    AlertLog.is_read == False,
+                ).values(is_read=True)
+            )
+
+    if payload.is_wandering is not None:
+        person.is_wandering = payload.is_wandering
+        if payload.is_wandering is False:
+            await db.execute(
+                update(AlertLog).where(
+                    AlertLog.person_id == person_id,
+                    AlertLog.alert_type == "wandering",
+                    AlertLog.is_read == False,
+                ).values(is_read=True)
+            )
+
     await db.commit()
     await db.refresh(person)
     return person

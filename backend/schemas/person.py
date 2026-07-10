@@ -15,6 +15,18 @@ class PersonUpdate(BaseModel):
     age: Optional[int] = None
     phone_number: Optional[str] = None
 
+# 대시보드에서 낙상/배회 상태를 수동 정상화(해제)할 때 사용
+class PersonStatusUpdate(BaseModel):
+    is_fall: Optional[bool] = None
+    is_wandering: Optional[bool] = None
+
+class PersonStatusResponse(BaseModel):
+    id: int
+    is_fall: bool
+    is_wandering: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
 class PersonResponse(BaseModel):
     id: int
     name: str

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List
 from datetime import datetime
 import uuid
+import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, update
 from sqlalchemy.exc import IntegrityError
@@ -16,9 +17,12 @@ from backend.database import get_db, get_independent_session
 from backend.models.person import TrackedPerson
 from backend.models.telemetry import GpsLog
 from backend.models.guardian import Guardian
-from backend.utils.time import to_naive_utc
+from backend.utils.time import to_naive_utc, utcnow, isoformat_utc
+from backend.core.websocket import manager
 
 from typing import Annotated
+
+logger = logging.getLogger(__name__)
 
 person_router = APIRouter(prefix="/persons", tags=["Persons"])
 
@@ -162,6 +166,21 @@ async def normalize_person_status(
 
     await db.commit()
     await db.refresh(person)
+
+    # 연결된 대시보드 세션 실시간 동기화(라이브 새로고침) — 미연결이면 무동작
+    try:
+        await manager.send_personal_message({
+            "type": "status_update",
+            "status": {
+                "personId": str(person_id),
+                "isFall": person.is_fall,
+                "isWandering": person.is_wandering,
+                "updatedAt": isoformat_utc(utcnow()),
+            },
+        }, current_user.id)
+    except Exception as e:  # WS 실패가 API 를 깨지 않도록
+        logger.error(f"[status] WS 브로드캐스트 실패 personId={person_id}: {e}")
+
     return person
 
 @person_router.delete("/{person_id}", status_code=status.HTTP_204_NO_CONTENT)

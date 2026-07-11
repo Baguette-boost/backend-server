@@ -41,17 +41,23 @@ class KSTFormatter(logging.Formatter):
 
 # 2. 통합 로그 설정 (Uvicorn + App)
 def setup_logging():
-    log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    formatter = KSTFormatter(log_format)
+    log_format = "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+    formatter = logging.Formatter(log_format)
+    formatter.converter = time.gmtime            # ③ 로그 시각 UTC 통일(DB·앱과 일치) — msec 유지로 순서 파악 용이
     handler = logging.StreamHandler()
     handler.setFormatter(formatter)
 
-    # Uvicorn 및 root 로거 설정
-    for name in [None, "uvicorn", "uvicorn.access", "uvicorn.error"]:
-        logger = logging.getLogger(name)
-        logger.setLevel(logging.INFO)
-        logger.handlers = [handler]
-        logger.propagate = False
+    # ② 단일 핸들러(root)로 일원화 — 중복 줄 방지
+    root = logging.getLogger()
+    root.handlers = [handler]
+    root.setLevel(logging.INFO)
+    # uvicorn 로거는 자체 핸들러 제거 후 root 로 전파(중복 방지)
+    for name in ("uvicorn", "uvicorn.access", "uvicorn.error"):
+        lg = logging.getLogger(name)
+        lg.handlers = []
+        lg.propagate = True
+    # ① SQL 로그 억제(engine echo=False 와 이중 안전장치)
+    logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
 
 setup_logging()
 logger = logging.getLogger("uvicorn") # 통합 로거 사용
@@ -65,7 +71,7 @@ async def lifespan(app: FastAPI):
     # 2. AI HTTP 클라이언트 시작
     try:
         logger.info("FastAPI Lifespan: AI 클라이언트 연결을 시도합니다.")
-        await ai_client.start()
+        ai_client.start()  # 동기 메서드 — await 하면 'NoneType await' 에러
     except Exception as e:
         logger.error(f"AI 컨테이너 연결 실패 (스케줄러는 정상 가동 유지됨): {e}")    
     

@@ -231,46 +231,55 @@ def _resample_20s(rows) -> list:
     return out
 
 
-async def enroll_wandering_models():
-    """[하루 1회] 미등록 환자 중 최근 WANDER_ENROLL_DAYS 일 GPS 가 게이트 충족 시 RF 개인 모델을 학습(enroll).
+async def enroll_person_wandering(db, person, client: httpx.AsyncClient) -> dict:
+    """한 환자의 최근 WANDER_ENROLL_DAYS 일 GPS 로 RF 개인 모델을 학습(enroll)한다.
 
     게이트: 유효 일수 >= WANDER_ENROLL_MIN_DAYS AND 20초 리샘플 fix >= WANDER_ENROLL_MIN_FIXES.
-    성공 시 wandering_enrolled=True. 재등록(생활패턴 변화)은 자동이 아니라 수동 트리거만 한다.
+    성공 시 person.wandering_enrolled=True (커밋은 호출부 책임). 스케줄러 잡·수동 재등록 공용.
+    return: {enrolled: bool, fixes: int, days: int, reason?: str, threshold?: float}
     """
+    since = utcnow() - timedelta(days=WANDER_ENROLL_DAYS)
+    rows = (await db.execute(
+        select(GpsLog.latitude, GpsLog.longitude, GpsLog.created_at)
+        .where(GpsLog.person_id == person.id, GpsLog.created_at >= since)
+        .order_by(GpsLog.created_at)
+    )).all()
+    fixes_rs = _resample_20s(rows)
+    distinct_days = len({int(t) // 86400 for t, _, _ in fixes_rs})
+
+    if len(fixes_rs) < WANDER_ENROLL_MIN_FIXES or distinct_days < WANDER_ENROLL_MIN_DAYS:
+        return {"enrolled": False, "reason": "insufficient_data", "fixes": len(fixes_rs), "days": distinct_days}
+
+    payload = {"fixes": [{"lat": lat, "lng": lng, "t": t} for t, lat, lng in fixes_rs]}
+    try:
+        resp = await client.post(f"/users/{person.id}/enroll", json=payload)
+    except Exception as e:
+        logger.error(f"[WANDER-ENROLL] personId={person.id} enroll 예외: {e}")
+        return {"enrolled": False, "reason": "request_error", "fixes": len(fixes_rs), "days": distinct_days}
+
+    if resp.status_code == 200:
+        person.wandering_enrolled = True
+        info = resp.json()
+        return {"enrolled": True, "fixes": len(fixes_rs), "days": distinct_days, "threshold": info.get("threshold")}
+    logger.error(f"[WANDER-ENROLL] personId={person.id} enroll 실패 HTTP {resp.status_code}: {resp.text[:200]}")
+    return {"enrolled": False, "reason": f"server_{resp.status_code}", "fixes": len(fixes_rs), "days": distinct_days}
+
+
+async def enroll_wandering_models():
+    """[하루 1회] 미등록(wandering_enrolled=False) 환자를 스캔해 게이트 충족 시 자동 enroll."""
     async with get_independent_session() as db:
-        since = utcnow() - timedelta(days=WANDER_ENROLL_DAYS)
         persons = (await db.execute(
             select(TrackedPerson).where(TrackedPerson.wandering_enrolled == False)
         )).scalars().all()
         if not persons:
             return
-
         async with httpx.AsyncClient(base_url=settings.AI_WANDER_URL, timeout=60.0) as client:
             for person in persons:
-                rows = (await db.execute(
-                    select(GpsLog.latitude, GpsLog.longitude, GpsLog.created_at)
-                    .where(GpsLog.person_id == person.id, GpsLog.created_at >= since)
-                    .order_by(GpsLog.created_at)
-                )).all()
-                fixes_rs = _resample_20s(rows)
-                distinct_days = len({int(t) // 86400 for t, _, _ in fixes_rs})
-
-                if len(fixes_rs) < WANDER_ENROLL_MIN_FIXES or distinct_days < WANDER_ENROLL_MIN_DAYS:
-                    logger.info(f"[WANDER-ENROLL] personId={person.id} 데이터 부족(fix={len(fixes_rs)}, days={distinct_days}) → 학습 보류")
-                    continue
-
-                payload = {"fixes": [{"lat": lat, "lng": lng, "t": t} for t, lat, lng in fixes_rs]}
-                try:
-                    resp = await client.post(f"/users/{person.id}/enroll", json=payload)
-                    if resp.status_code == 200:
-                        person.wandering_enrolled = True
-                        info = resp.json()
-                        logger.info(f"[WANDER-ENROLL] personId={person.id} 등록 완료 (fix={len(fixes_rs)}, days={distinct_days}, thr={info.get('threshold')})")
-                    else:
-                        logger.error(f"[WANDER-ENROLL] personId={person.id} enroll 실패 HTTP {resp.status_code}: {resp.text[:200]}")
-                except Exception as e:
-                    logger.error(f"[WANDER-ENROLL] personId={person.id} enroll 예외: {e}")
-
+                r = await enroll_person_wandering(db, person, client)
+                if r["enrolled"]:
+                    logger.info(f"[WANDER-ENROLL] personId={person.id} 등록 완료 (fix={r['fixes']}, days={r['days']}, thr={r.get('threshold')})")
+                elif r["reason"] == "insufficient_data":
+                    logger.info(f"[WANDER-ENROLL] personId={person.id} 데이터 부족(fix={r['fixes']}, days={r['days']}) → 학습 보류")
         await db.commit()
 
 

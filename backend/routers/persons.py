@@ -19,6 +19,9 @@ from backend.models.telemetry import GpsLog
 from backend.models.guardian import Guardian
 from backend.utils.time import to_naive_utc, utcnow, isoformat_utc
 from backend.core.websocket import manager
+from backend.core.scheduler import enroll_person_wandering
+from backend.config import settings
+import httpx
 
 from typing import Annotated
 
@@ -182,6 +185,28 @@ async def normalize_person_status(
         logger.error(f"[status] WS 브로드캐스트 실패 personId={person_id}: {e}")
 
     return person
+
+@person_router.post("/{person_id}/wandering/re-enroll")
+async def reenroll_wandering(
+    person_id: int,
+    current_user: Annotated[Guardian, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db)
+):
+    """[대시보드] 배회 개인모델 수동 재등록.
+
+    생활패턴이 '정당하게' 바뀐 경우(이사·계절)만 최근 14일 GPS 로 재학습(.joblib 덮어씀).
+    자동/주기 재등록은 진행성 배회를 '정상'으로 흡수할 위험이 있어 금지 — 이 수동 트리거만 재학습한다.
+    """
+    person = await check_guardian_ownership(person_id, current_user.id, db)
+    async with httpx.AsyncClient(base_url=settings.AI_WANDER_URL, timeout=60.0) as client:
+        result = await enroll_person_wandering(db, person, client)
+    await db.commit()
+    if not result["enrolled"]:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"재등록 실패({result.get('reason')}): 최근 14일 fix={result.get('fixes')}, days={result.get('days')} (게이트 미달)"
+        )
+    return {"personId": person_id, "wanderingEnrolled": True, **result}
 
 @person_router.delete("/{person_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_person(

@@ -197,7 +197,7 @@ async def receive_gps(
     person = (await db.execute(stmt)).scalar_one_or_none()
 
     if not person:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="등록되지 않은 환자입니다")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unregistered patient.")
     
     current_time = utcnow()
 
@@ -252,7 +252,7 @@ async def receive_fall_suspect(
     ).scalar_one_or_none()
 
     if not person:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="등록되지 않은 환자입니다")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unregistered patient.")
 
     try:
         imu_dict = request.imuData.dict()
@@ -273,7 +273,7 @@ async def receive_fall_suspect(
         logger.error(f"[FALL pid={request.personId}] payload 구성 실패: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="낙상 의심 데이터 처리 중 오류가 발생했습니다"
+            detail="An error occurred while processing fall-suspect data."
         )
 
     # 디바이스에는 즉시 202 Accepted 를 반환하고, 저장·AI 판정·알림은 단일 백그라운드 태스크로 위임

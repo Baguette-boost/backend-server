@@ -35,7 +35,7 @@ async def signup(payload: SignUpRequest, db: AsyncSession = Depends(get_db)):
     if guardian:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="이미 사용 중인 아이디입니다."
+            detail="Username already in use."
         )        
 
     # 유저 생성 ORM 로직
@@ -141,7 +141,7 @@ async def test_bypass_logic(current_guardian: Guardian = Depends(get_current_use
     [디버깅용] 인증 우회(Mocking)가 잘 작동하는지 확인하는 엔드포인트
     """
     return {
-        "message": "인증 샌드박스 통과 성공!",
+        "message": "Auth sandbox passed.",
         "phone": current_guardian.phone,
         "name": current_guardian.name
     }

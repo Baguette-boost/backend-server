@@ -40,7 +40,7 @@ class IMUData(BaseModel):
         # 9채널 리스트 길이가 모두 같아야 한다(불일치·누락 채널 → 422로 거른다)
         lengths = {ch: len(getattr(self, ch)) for ch in _IMU_CHANNELS}
         if len(set(lengths.values())) != 1:
-            raise ValueError(f"IMU 9채널 리스트 길이가 모두 같아야 합니다: {lengths}")
+            raise ValueError(f"All 9 IMU channels must have the same length: {lengths}")
         return self
 
 class FallSuspectRequest(BaseModel):

@@ -37,12 +37,12 @@ async def check_guardian_ownership(person_id: int, guardian_id: int, db: AsyncSe
     person = (await db.execute(stmt)).scalars().first()
 
     if not person:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="환자를 찾을 수 없습니다.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found.")
     
     if person.guardian_id != guardian_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, 
-            detail="해당 환자 정보에 접근할 권한이 없습니다."
+            detail="You do not have permission to access this patient."
         )
     return person
 
@@ -75,7 +75,7 @@ async def register_person(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="이미 등록된 디바이스 토큰입니다."
+            detail="Device token already registered."
         )
     await db.refresh(new_person)
 
@@ -91,7 +91,7 @@ async def get_persons(current_guardian: Guardian = Depends(get_current_user), db
     rst = (await db.execute(stmt)).scalars().all()
     
     if not rst:
-        raise HTTPException(status_code=404, detail="환자 데이터를 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail="No patient data found.")
     
     return rst
 
@@ -112,7 +112,7 @@ async def update_person(
 ):
     values = payload.model_dump(exclude_unset=True)
     if not values:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="수정할 필드가 없습니다.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No fields to update.")
 
     res = await db.execute(select(TrackedPerson).where(TrackedPerson.id == id, TrackedPerson.guardian_id == current_user.id))
     person = res.scalar_one_or_none()
@@ -141,7 +141,7 @@ async def normalize_person_status(
     person = await check_guardian_ownership(person_id, current_user.id, db)
 
     if payload.is_fall is None and payload.is_wandering is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="변경할 상태가 없습니다.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No status to update.")
 
     if payload.is_fall is not None:
         person.is_fall = payload.is_fall
@@ -204,7 +204,7 @@ async def reenroll_wandering(
     if not result["enrolled"]:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"재등록 실패({result.get('reason')}): 최근 14일 fix={result.get('fixes')}, days={result.get('days')} (게이트 미달)"
+            detail=f"Re-enrollment failed ({result.get('reason')}): last 14 days fix={result.get('fixes')}, days={result.get('days')} (gate not met)"
         )
     return {"personId": person_id, "wanderingEnrolled": True, **result}
 
@@ -223,7 +223,7 @@ async def delete_person(
     )
     person = (await db.execute(stmt)).scalar_one_or_none()
     if not person:
-        raise HTTPException(status_code=404, detail="환자를 찾을 수 없습니다")
+        raise HTTPException(status_code=404, detail="Patient not found")
     
     stmt = delete(TrackedPerson).where(
         TrackedPerson.id == person_id
@@ -256,7 +256,7 @@ async def get_person_location(
     latest_log = (await db.execute(stmt)).scalars().first()
 
     if not latest_log:
-        raise HTTPException(status_code=404, detail="위치 데이터를 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail="No location data found.")
 
     # 낙상/배회는 gps_logs 플래그(파이프라인 A 제거로 미사용)가 아니라
     # 에피소드 상태(person.is_fall / person.is_wandering)를 반영한다.

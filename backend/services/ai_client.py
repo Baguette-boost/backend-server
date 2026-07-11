@@ -5,6 +5,10 @@ from backend.schemas.ai import AIPredictRequest, AIPredictResponse, DetectionRes
 
 logger = logging.getLogger(__name__)
 
+# RF /detect 지연은 fix 수에 비례(180점≈11s>timeout). 최근 N점만 보내 지연을 bound한다.
+# RF 10분 윈도우(20초 간격)=~30점 + 디바운스(3연속) 여유. 60점≈2.5s(<5s timeout).
+WANDER_DETECT_MAX_FIXES = 60
+
 
 def _wander_result(person_id: int, triggered: bool, prob: float) -> AIPredictResponse:
     return AIPredictResponse(
@@ -68,6 +72,8 @@ class AIClient:
             {"lat": float(p.latitude), "lng": float(p.longitude)}
             for p in (payload.gpsData or [])
         ]
+        # 최근 N점만 전송(버퍼가 커도 /detect 지연을 bound). RF 윈도우엔 최근 궤적이면 충분.
+        fixes = fixes[-WANDER_DETECT_MAX_FIXES:]
         # RF 는 최소 3점 필요(실질적으로 1윈도우=30점 이상이라야 판정). 부족하면 비트리거.
         if len(fixes) < 3:
             return _wander_result(person_id, False, 0.0)

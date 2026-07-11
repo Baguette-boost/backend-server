@@ -101,8 +101,8 @@ app.include_router(telemetry_router)
 # alert 라우터 등록
 app.include_router(alert_router)
 
-# GPS 인메모리 버퍼 공간 선언
-# 구조: {person_id: deque(maxlen=180)} -> 10초 주기 기준 30분 분량 = 180개
+# GPS 인메모리 버퍼 공간 선언 (실사용 버퍼는 core/buffer.py 의 patient_gps_buffer)
+# 구조: {person_id: deque(maxlen=45)} -> 20초 주기 기준 15분 분량 = 45개
 # 데이터 포맷 예시: {"lat": 37.123, "lng": 127.123, "timestamp": 1700000000}
 gps_inmemory_buffers: Dict[int, deque] = {}
 

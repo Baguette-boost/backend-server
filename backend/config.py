@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     DEBUG_MODE: bool
     # 낙상/배회 추론 컨테이너 (Stage 3: 역할별 분리)
     AI_FALL_URL: str = "http://baguetteboost-ai-fall:5000"
-    AI_WANDER_URL: str = "http://baguetteboost-ai-wander:5000"
+    AI_WANDER_URL: str = "http://baguetteboost-ai-wander:8000"
     AI_REQUEST_TIMEOUT: int = 5 # 타임아웃 5초 설정
     MYSQL_ROOT_PASSWORD: str
     MYSQL_DATABASE: str

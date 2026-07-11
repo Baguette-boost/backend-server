@@ -65,21 +65,20 @@ services:
       baguetteboost-backend:
         condition: service_started
 
-  # 배회 전용 추론 컨테이너 (BinaryLSTM, iccas_final_lstm_gps_wandering.pt)
+  # 배회 전용 추론 컨테이너 (환자별 Random Forest — 팀원 wandering_detector/serve.py, 무수정)
+  # /users/{id}/enroll(학습)·/users/{id}/detect(판정), 포트 8000, 모델은 /data 볼륨에 사용자별 .joblib
   baguetteboost-ai-wander:
     build:
-      context: .
-      dockerfile: ai-serve/Dockerfile
+      context: ./wandering_detector
+      dockerfile: Dockerfile
     environment:
       - TZ=UTC
-      - FALL_MODEL_PATH=             # 비움 → 낙상 미로드(배회 전용)
-      - WANDER_MODEL_PATH=models/iccas_final_lstm_gps_wandering.pt
     container_name: baguetteboost-ai-wander
     restart: unless-stopped
-    env_file:
-      - .env
     networks:
       - baguetteboost-network
+    volumes:
+      - wander_models:/data      # 환자별 .joblib 영속(컨테이너 재시작에도 유지)
     depends_on:
       baguetteboost-backend:
         condition: service_started
@@ -87,6 +86,8 @@ services:
 volumes:
   db_data:
     name: baguetteboost-db-data
+  wander_models:
+    name: baguetteboost-wander-models
 
 networks:
   baguetteboost-network:

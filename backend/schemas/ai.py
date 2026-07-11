@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, BeforeValidator, PlainSerializer
+from pydantic import BaseModel, Field, BeforeValidator, PlainSerializer, model_validator
 from typing import Annotated, List, Optional
 from datetime import datetime
 
@@ -23,6 +23,14 @@ class IMUData(BaseModel):
     wx: List[float]
     wy: List[float]
     wz: List[float]
+
+    @model_validator(mode="after")
+    def _channels_same_length(self):
+        # 백엔드→AI 내부 방어: 9채널 길이 일치 (불일치면 payload 구성 단계에서 걸린다)
+        lengths = {ch: len(getattr(self, ch)) for ch in ("roll", "pitch", "yaw", "ax", "ay", "az", "wx", "wy", "wz")}
+        if len(set(lengths.values())) != 1:
+            raise ValueError(f"IMU 9채널 리스트 길이가 모두 같아야 합니다: {lengths}")
+        return self
 
 class GPSPoint(BaseModel):
     timestamp: AiUtcDatetime

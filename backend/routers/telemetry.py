@@ -92,6 +92,10 @@ async def process_fall_suspect(person_id: int, recorded_at, imu_dict: dict, samp
     # 트레이드오프: 재전송 시 predict 가 한 번 더 호출될 수 있으나, 낙상은 이벤트 기반이라 빈도가 낮다.
     # (미연결·초기화 실패·타임아웃 등으로 predict 가 None 이면 predicted_label=None 으로 미판정 처리)
     ai_result = await ai_client.predict(payload)
+    if ai_result is None:
+        # AI 판정 실패(미연결·타임아웃·오류 등). ai_client 가 사유를 이미 로깅함.
+        # 여기서는 상태를 명시적으로 '미판정'으로 남긴다(predicted_label=None → 알림/에피소드 없음).
+        logger.warning(f"[FALL pid={person_id}] AI 판정 실패 → 미판정(predicted_label=None)")
     predicted = (
         ai_result.fall_detection.is_triggered
         if (ai_result and ai_result.fall_detection is not None) else None

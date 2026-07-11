@@ -1,6 +1,9 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import List, Optional
 from decimal import Decimal
+
+# IMU 9채널 이름
+_IMU_CHANNELS = ("roll", "pitch", "yaw", "ax", "ay", "az", "wx", "wy", "wz")
 
 from backend.utils.time import IncomingUtcDatetime
 
@@ -31,6 +34,14 @@ class IMUData(BaseModel):
     wx: List[float] = Field(default_factory=list)
     wy: List[float] = Field(default_factory=list)
     wz: List[float] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _channels_same_length(self):
+        # 9채널 리스트 길이가 모두 같아야 한다(불일치·누락 채널 → 422로 거른다)
+        lengths = {ch: len(getattr(self, ch)) for ch in _IMU_CHANNELS}
+        if len(set(lengths.values())) != 1:
+            raise ValueError(f"IMU 9채널 리스트 길이가 모두 같아야 합니다: {lengths}")
+        return self
 
 class FallSuspectRequest(BaseModel):
     personId: int

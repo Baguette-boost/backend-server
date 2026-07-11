@@ -340,12 +340,18 @@ def health() -> dict:
 def _detect_fall(req: PredictRequest) -> DetectionResult:
     if fall_predictor is None or req.imuData is None:
         return DetectionResult(is_triggered=False, probability=0.0)
-    n = len(req.imuData.ax)
+    imu = req.imuData
+    # 9채널 길이 일치 방어 — 하나라도 다르면 비트리거(불일치 로그)
+    lengths = [len(getattr(imu, ch)) for ch in ("roll", "pitch", "yaw", "ax", "ay", "az", "wx", "wy", "wz")]
+    if len(set(lengths)) != 1:
+        logger.info("IMU 채널 길이 불일치 personId=%s lens=%s → 비트리거", req.personId, lengths)
+        return DetectionResult(is_triggered=False, probability=0.0)
+    n = lengths[0]
     if n < fall_predictor.sequence_length:
-        logger.info("IMU 표본 부족 personId=%s n=%d (<%d)", req.personId, n, fall_predictor.sequence_length)
+        logger.info("IMU 표본 부족 personId=%s n=%d (<%d) → 비트리거", req.personId, n, fall_predictor.sequence_length)
         return DetectionResult(is_triggered=False, probability=0.0)
     try:
-        prob = fall_predictor.predict_fall(req.imuData)
+        prob = fall_predictor.predict_fall(imu)
     except Exception as exc:  # noqa: BLE001
         logger.exception("낙상 추론 실패 personId=%s: %s", req.personId, exc)
         return DetectionResult(is_triggered=False, probability=0.0)

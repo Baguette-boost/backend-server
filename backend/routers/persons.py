@@ -182,7 +182,7 @@ async def normalize_person_status(
             },
         }, current_user.id)
     except Exception as e:  # WS 실패가 API 를 깨지 않도록
-        logger.error(f"[status] WS 브로드캐스트 실패 personId={person_id}: {e}")
+        logger.error(f"[STATUS pid={person_id}] WS 브로드캐스트 실패: {e}")
 
     return person
 

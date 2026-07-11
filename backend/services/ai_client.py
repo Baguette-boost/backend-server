@@ -49,13 +49,13 @@ class AIClient:
             response.raise_for_status()
             return AIPredictResponse(**response.json())
         except httpx.TimeoutException:
-            logger.error(f"AI fall timeout for personId: {payload.personId}")
+            logger.error(f"[FALL pid={payload.personId}] AI timeout")
         except httpx.RequestError as e:
-            logger.error(f"Connection error to AI fall: {e}")
+            logger.error(f"[FALL pid={payload.personId}] 연결 오류: {e}")
         except httpx.HTTPStatusError as e:
-            logger.error(f"AI fall returned HTTP {e.response.status_code}")
+            logger.error(f"[FALL pid={payload.personId}] AI HTTP {e.response.status_code}")
         except Exception as e:
-            logger.error(f"Unexpected error during fall prediction: {e}")
+            logger.error(f"[FALL pid={payload.personId}] 예외: {e}")
         return None
 
     # ── 배회: 팀원 RF 서버 POST /users/{personId}/detect {"fixes":[{lat,lng}]} ──
@@ -75,7 +75,7 @@ class AIClient:
             response = await self.wander_client.post(f"/users/{person_id}/detect", json={"fixes": fixes})
             if response.status_code == 404:
                 # 미등록(학습 중) → 배회 비트리거 (조용히)
-                logger.info(f"[wander] personId={person_id} 미등록(학습 중) → 비트리거")
+                logger.info(f"[WANDER pid={person_id}] 미등록(학습 중) → 비트리거")
                 return _wander_result(person_id, False, 0.0)
             if response.status_code == 422:
                 # 데이터 부족(1윈도우 미만 등) → 비트리거
@@ -87,13 +87,13 @@ class AIClient:
             prob = float(data.get("max_prob") or 0.0)
             return _wander_result(person_id, wandering, prob)
         except httpx.TimeoutException:
-            logger.error(f"AI wander timeout for personId: {person_id}")
+            logger.error(f"[WANDER pid={person_id}] AI timeout")
         except httpx.RequestError as e:
-            logger.error(f"Connection error to AI wander: {e}")
+            logger.error(f"[WANDER pid={person_id}] 연결 오류: {e}")
         except httpx.HTTPStatusError as e:
-            logger.error(f"AI wander returned HTTP {e.response.status_code}")
+            logger.error(f"[WANDER pid={person_id}] AI HTTP {e.response.status_code}")
         except Exception as e:
-            logger.error(f"Unexpected error during wander detection: {e}")
+            logger.error(f"[WANDER pid={person_id}] 예외: {e}")
         return None
 
 

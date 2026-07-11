@@ -198,14 +198,14 @@ async def monitor_fall_episodes():
             if moved:
                 person.is_fall = False
                 person.fall_pending = False  # 회복 → 에피소드 종료
-                logger.info(f"[FALL-EPISODE] personId={person.id} 회복 (imu={imu_state}, Rg={rg_str}) → is_fall 해제·에피소드 종료")
+                logger.info(f"[FALL-EPISODE pid={person.id}]회복 (imu={imu_state}, Rg={rg_str}) → is_fall 해제·에피소드 종료")
             elif still:
                 person.is_fall = True        # 여전히 쓰러짐 → 유지
                 # 에피소드는 닫지 않고 계속 감시 → 회복 시 자동 해제(고착 방지)
-                logger.warning(f"[FALL-EPISODE] personId={person.id} 부동 지속 (imu={imu_state}, Rg={rg_str}) → is_fall 유지·감시 지속")
+                logger.warning(f"[FALL-EPISODE pid={person.id}]부동 지속 (imu={imu_state}, Rg={rg_str}) → is_fall 유지·감시 지속")
             else:
                 # IMU 판단불가 & GPS 부족 → 판정 보류(다음 주기 재평가)
-                logger.info(f"[FALL-EPISODE] personId={person.id} 판정 보류 (imu={imu_state}, gps점={len(points)})")
+                logger.info(f"[FALL-EPISODE pid={person.id}]판정 보류 (imu={imu_state}, gps점={len(points)})")
 
         await db.commit()
 
@@ -254,14 +254,14 @@ async def enroll_person_wandering(db, person, client: httpx.AsyncClient) -> dict
     try:
         resp = await client.post(f"/users/{person.id}/enroll", json=payload)
     except Exception as e:
-        logger.error(f"[WANDER-ENROLL] personId={person.id} enroll 예외: {e}")
+        logger.error(f"[WANDER-ENROLL pid={person.id}]enroll 예외: {e}")
         return {"enrolled": False, "reason": "request_error", "fixes": len(fixes_rs), "days": distinct_days}
 
     if resp.status_code == 200:
         person.wandering_enrolled = True
         info = resp.json()
         return {"enrolled": True, "fixes": len(fixes_rs), "days": distinct_days, "threshold": info.get("threshold")}
-    logger.error(f"[WANDER-ENROLL] personId={person.id} enroll 실패 HTTP {resp.status_code}: {resp.text[:200]}")
+    logger.error(f"[WANDER-ENROLL pid={person.id}]enroll 실패 HTTP {resp.status_code}: {resp.text[:200]}")
     return {"enrolled": False, "reason": f"server_{resp.status_code}", "fixes": len(fixes_rs), "days": distinct_days}
 
 
@@ -277,9 +277,9 @@ async def enroll_wandering_models():
             for person in persons:
                 r = await enroll_person_wandering(db, person, client)
                 if r["enrolled"]:
-                    logger.info(f"[WANDER-ENROLL] personId={person.id} 등록 완료 (fix={r['fixes']}, days={r['days']}, thr={r.get('threshold')})")
+                    logger.info(f"[WANDER-ENROLL pid={person.id}]등록 완료 (fix={r['fixes']}, days={r['days']}, thr={r.get('threshold')})")
                 elif r["reason"] == "insufficient_data":
-                    logger.info(f"[WANDER-ENROLL] personId={person.id} 데이터 부족(fix={r['fixes']}, days={r['days']}) → 학습 보류")
+                    logger.info(f"[WANDER-ENROLL pid={person.id}]데이터 부족(fix={r['fixes']}, days={r['days']}) → 학습 보류")
         await db.commit()
 
 

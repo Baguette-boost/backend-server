@@ -6,7 +6,7 @@ from backend.config import settings
 # 비동기 MySQL 엔진 연결
 engine = create_async_engine(
     settings.DATABASE_URL,
-    echo=True,
+    echo=False,  # SQL 로그 홍수 방지(필요 시 디버깅에서만 True). setup_logging 에서도 sqlalchemy.engine=WARNING
     pool_pre_ping=True,
     pool_size=10,
     max_overflow=20,

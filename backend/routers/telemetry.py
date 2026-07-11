@@ -76,7 +76,7 @@ async def async_insert_gps_log(person_id: int, gps_data: dict):
             created_at=clean_timestamp
         )
 
-        logger.info(f"[DB INSERT] personId: {person_id}, gps: {gps_data}")
+        logger.info(f"[GPS pid={person_id}] insert gps={gps_data}")
 
         db.add(new_gps)
         await db.commit()
@@ -106,7 +106,7 @@ async def process_fall_suspect(person_id: int, recorded_at, imu_dict: dict, samp
             )
         )
         if dup.scalar_one_or_none() is not None:
-            logger.info(f"[FALL] 재전송 감지, skip personId={person_id}, recorded_at={recorded_at}")
+            logger.info(f"[FALL pid={person_id}] 재전송 감지 skip recorded_at={recorded_at}")
             return
 
         # IMU 원본 + AI 예측 저장 (판정 결과와 무관하게 재학습용 원본은 항상 보존)
@@ -164,7 +164,7 @@ async def process_fall_suspect(person_id: int, recorded_at, imu_dict: dict, samp
                         created_at=utcnow(),
                     ))
 
-        logger.info(f"[FALL] personId={person_id}, predicted={predicted}, samples={sample_count}, new_episode={newly_started}")
+        logger.info(f"[FALL pid={person_id}] predicted={predicted}, samples={sample_count}, new_episode={newly_started}")
         await db.commit()
 
     # 새 낙상 에피소드가 시작된 경우에만 실시간 알림 1회 (WebSocket + Expo Push)
@@ -266,7 +266,7 @@ async def receive_fall_suspect(
     except Exception as e:
         # 버퍼에 손상된 GPS 데이터가 섞이는 등 payload 구성 단계에서 발생하는 예외를
         # 트레이스백 노출 없이 로깅 후 500으로 반환한다.
-        logger.error(f"[fall-suspect] payload 구성 실패 personId={request.personId}: {e}")
+        logger.error(f"[FALL pid={request.personId}] payload 구성 실패: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="낙상 의심 데이터 처리 중 오류가 발생했습니다"

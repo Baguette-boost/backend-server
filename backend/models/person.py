@@ -28,6 +28,8 @@ class TrackedPerson(Base, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False)
     is_fall: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"), default=False)
     is_wandering:Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"), default=False)
+    # 배회 RF 개인 모델 등록(enroll) 완료 여부. False=학습 중(데이터 축적 대기), True=판정 가능
+    wandering_enrolled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"), default=False)
     # 낙상 후 부동(이동 없음) 판정 에피소드 상태
     fall_pending: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"), default=False)
     fall_started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)  # 에피소드(윈도우) 시작 시각

@@ -1,6 +1,7 @@
 import logging
 import math
-from datetime import datetime, timedelta
+import httpx
+from datetime import datetime, timedelta, timezone
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +13,7 @@ from backend.models.telemetry import GpsLog, ImuLog
 from backend.services.notification_service import NotificationService, get_guardian_token_and_name, send_emergency_push
 from backend.utils.time import utcnow
 from backend.utils.geo import clean_track, radius_of_gyration_m
+from backend.config import settings
 import asyncio
 
 # logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -31,6 +33,12 @@ FALL_IMU_MAX_LOGS = 30          # 조회할 최근 imu_logs 최대 개수(성능
 FALL_IMU_MIN_SAMPLES = 50       # 판정에 필요한 최소 IMU 표본 수(미만이면 unknown)
 FALL_ACTIVE_ACCEL_STD = 0.08    # accel_norm 표준편차(g) 이 이상이면 '활동' (임시값 — 실데이터 보정 필요)
 FALL_ACTIVE_GYRO_MEAN = 20.0    # gyro_norm 평균(deg/s) 이 이상이면 '활동' (임시값 — 실데이터 보정 필요)
+
+# 배회 RF 개인 모델 enroll 파라미터 (하루 1회 스케줄러가 미등록 환자를 학습)
+WANDER_ENROLL_DAYS = 14         # 학습에 사용할 최근 GPS 기간(일)
+WANDER_ENROLL_MIN_DAYS = 7      # 게이트: 유효 데이터가 있는 최소 일수
+WANDER_ENROLL_MIN_FIXES = 1000  # 게이트: 20초 리샘플 후 최소 fix 수
+WANDER_RESAMPLE_SECONDS = 20    # RF 전제(20초 간격)에 맞춰 리샘플
 
 # 배회 감지는 GPS 수신 경로(receive_gps → broadcast_event)에서 매 핑마다 처리하므로
 # 별도 스케줄러 잡(check_wandering_job)은 제거되었다.
@@ -201,6 +209,71 @@ async def monitor_fall_episodes():
 
         await db.commit()
 
+def _resample_20s(rows) -> list:
+    """(lat, lng, created_at[naive UTC]) 시퀀스를 20초당 1점으로 리샘플한다.
+
+    (0,0)·None 제거 후, 각 20초 bin 의 첫 점만 취한다. 반환: [(t_unix, lat, lng), ...]
+    """
+    out = []
+    seen_bins = set()
+    for lat, lng, ts in rows:
+        if lat is None or lng is None or ts is None:
+            continue
+        lat_f, lng_f = float(lat), float(lng)
+        if lat_f == 0.0 and lng_f == 0.0:
+            continue
+        epoch = ts.replace(tzinfo=timezone.utc).timestamp()  # created_at 은 naive UTC
+        bin_id = int(epoch // WANDER_RESAMPLE_SECONDS)
+        if bin_id in seen_bins:
+            continue
+        seen_bins.add(bin_id)
+        out.append((bin_id * WANDER_RESAMPLE_SECONDS, lat_f, lng_f))
+    return out
+
+
+async def enroll_wandering_models():
+    """[하루 1회] 미등록 환자 중 최근 WANDER_ENROLL_DAYS 일 GPS 가 게이트 충족 시 RF 개인 모델을 학습(enroll).
+
+    게이트: 유효 일수 >= WANDER_ENROLL_MIN_DAYS AND 20초 리샘플 fix >= WANDER_ENROLL_MIN_FIXES.
+    성공 시 wandering_enrolled=True. 재등록(생활패턴 변화)은 자동이 아니라 수동 트리거만 한다.
+    """
+    async with get_independent_session() as db:
+        since = utcnow() - timedelta(days=WANDER_ENROLL_DAYS)
+        persons = (await db.execute(
+            select(TrackedPerson).where(TrackedPerson.wandering_enrolled == False)
+        )).scalars().all()
+        if not persons:
+            return
+
+        async with httpx.AsyncClient(base_url=settings.AI_WANDER_URL, timeout=60.0) as client:
+            for person in persons:
+                rows = (await db.execute(
+                    select(GpsLog.latitude, GpsLog.longitude, GpsLog.created_at)
+                    .where(GpsLog.person_id == person.id, GpsLog.created_at >= since)
+                    .order_by(GpsLog.created_at)
+                )).all()
+                fixes_rs = _resample_20s(rows)
+                distinct_days = len({int(t) // 86400 for t, _, _ in fixes_rs})
+
+                if len(fixes_rs) < WANDER_ENROLL_MIN_FIXES or distinct_days < WANDER_ENROLL_MIN_DAYS:
+                    logger.info(f"[WANDER-ENROLL] personId={person.id} 데이터 부족(fix={len(fixes_rs)}, days={distinct_days}) → 학습 보류")
+                    continue
+
+                payload = {"fixes": [{"lat": lat, "lng": lng, "t": t} for t, lat, lng in fixes_rs]}
+                try:
+                    resp = await client.post(f"/users/{person.id}/enroll", json=payload)
+                    if resp.status_code == 200:
+                        person.wandering_enrolled = True
+                        info = resp.json()
+                        logger.info(f"[WANDER-ENROLL] personId={person.id} 등록 완료 (fix={len(fixes_rs)}, days={distinct_days}, thr={info.get('threshold')})")
+                    else:
+                        logger.error(f"[WANDER-ENROLL] personId={person.id} enroll 실패 HTTP {resp.status_code}: {resp.text[:200]}")
+                except Exception as e:
+                    logger.error(f"[WANDER-ENROLL] personId={person.id} enroll 예외: {e}")
+
+        await db.commit()
+
+
 def start_scheduler():
     logger.info("## [스케줄러] start_scheduler() 함수가 호출되었습니다! ##")
 
@@ -208,6 +281,8 @@ def start_scheduler():
     scheduler.add_job(monitor_device_heartbeats, 'interval', minutes=1)
     # 1분 주기로 낙상 부동 판정 루프 가동
     scheduler.add_job(monitor_fall_episodes, 'interval', minutes=1)
+    # 하루 1회(새벽 3시) 미등록 환자 배회 RF 모델 enroll
+    scheduler.add_job(enroll_wandering_models, 'cron', hour=3)
     scheduler.start()
 
 def stop_scheduler():

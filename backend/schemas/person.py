@@ -34,6 +34,7 @@ class PersonResponse(BaseModel):
     device_id: str = Field(..., alias="deviceId", description="디바이스 id")
     device_token: str = Field(..., alias="deviceToken", description="디바이스 식별 토큰")
     phone_number: Optional[str] = Field(None, alias="phoneNumber", description="환자 전화번호(없으면 null)")
+    wandering_enrolled: bool = Field(False, alias="wanderingEnrolled", description="배회 개인모델 등록 완료 여부(false=학습 중)")
     created_at: OutgoingUtcDatetime = Field(..., alias="createdAt")
 
     # 해당 pydantic 모델의 동작 방식을 제어하는 규칙 설정

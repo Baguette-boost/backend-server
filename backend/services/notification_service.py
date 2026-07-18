@@ -21,6 +21,11 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+# Android heads-up(창) 알림용 채널 id. 앱이 동일 id의 채널을 HIGH/MAX importance 로
+# 등록(setNotificationChannelAsync)해야 배너/헤드업으로 표시된다. 미지정 시 저importance
+# 기본 채널로 처리돼 앱 UI 배너가 뜨지 않는다. iOS 는 무시되는 필드라 안전하다.
+EXPO_ANDROID_CHANNEL_ID = "default"
+
 async def get_guardian_token_and_name(person_id: int) -> dict:
     """환자 ID를 통해 보호자의 ID 및 Expo Push 토큰을 비동기로 안전하게 조회"""
     async with get_independent_session() as db:
@@ -59,6 +64,7 @@ async def send_emergency_push(expo_token: str, elder_name: str, alert_type: str)
         "title": f"🚨 Emergency Alert: {elder_name}",
         "body": body_msg,
         "priority": "high",
+        "channelId": EXPO_ANDROID_CHANNEL_ID,   # Android heads-up 표시용(미지정 시 배너 안 뜸)
         "data": {"screen": "EmergencyMap", "alert_type": alert_type}
     }
 
@@ -238,8 +244,9 @@ class NotificationService:
                 title=title,
                 body=body,
                 data=extra_data or {},
-                sound="default",    # 알림 소리 발생
-                priority="high"     # 즉시 전송 및 화면 깨우기(OS 정책에 따라 다름)
+                sound="default",                        # 알림 소리 발생
+                priority="high",                        # 즉시 전송 및 화면 깨우기(OS 정책에 따라 다름)
+                channel_id=EXPO_ANDROID_CHANNEL_ID,     # Android heads-up 표시용(SDK가 channelId 로 직렬화)
             )
 
             # SDK publish가 동기 함수이므로 to_thread를 통해 비동기 처리

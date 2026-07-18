@@ -1,0 +1,240 @@
+<title>백엔드 부하테스트 결과 — 400명 램프</title>
+<style>
+  :root{
+    --paper:#f5f6f8; --panel:#ffffff; --ink:#171b21; --ink-2:#4a525d; --ink-3:#78818d;
+    --line:#e2e5ea; --line-2:#eef0f3;
+    --accent:#0f9e8f;              /* throughput teal */
+    --good:#3a9c5d; --warn:#c8791a; --crit:#d6453b;
+    --good-bg:#e7f3ec; --warn-bg:#f7ecda; --crit-bg:#f8e6e4;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,"JetBrains Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --paper:#0c1015; --panel:#141a21; --ink:#e6edf3; --ink-2:#a6b1bd; --ink-3:#6f7b88;
+      --line:#232c36; --line-2:#1a212a;
+      --accent:#2bb7a6; --good:#4bb56e; --warn:#e0a44e; --crit:#f2685e;
+      --good-bg:#12281c; --warn-bg:#2a2011; --crit-bg:#2c1614;
+    }
+  }
+  :root[data-theme="light"]{
+    --paper:#f5f6f8; --panel:#ffffff; --ink:#171b21; --ink-2:#4a525d; --ink-3:#78818d;
+    --line:#e2e5ea; --line-2:#eef0f3; --accent:#0f9e8f; --good:#3a9c5d; --warn:#c8791a; --crit:#d6453b;
+    --good-bg:#e7f3ec; --warn-bg:#f7ecda; --crit-bg:#f8e6e4;
+  }
+  :root[data-theme="dark"]{
+    --paper:#0c1015; --panel:#141a21; --ink:#e6edf3; --ink-2:#a6b1bd; --ink-3:#6f7b88;
+    --line:#232c36; --line-2:#1a212a; --accent:#2bb7a6; --good:#4bb56e; --warn:#e0a44e; --crit:#f2685e;
+    --good-bg:#12281c; --warn-bg:#2a2011; --crit-bg:#2c1614;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+    line-height:1.6;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:980px;margin:0 auto;padding:48px 24px 80px}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--accent);font-weight:600;margin:0 0 10px}
+  h1{font-size:30px;line-height:1.2;margin:0 0 8px;font-weight:750;letter-spacing:-.02em;text-wrap:balance}
+  h2{font-size:19px;margin:52px 0 16px;font-weight:700;letter-spacing:-.01em;
+    padding-top:20px;border-top:1px solid var(--line)}
+  h2 .n{font-family:var(--mono);color:var(--ink-3);font-weight:600;font-size:14px;margin-right:10px}
+  .sub{color:var(--ink-2);font-size:15px;margin:0;max-width:64ch}
+  .meta{font-family:var(--mono);font-size:12px;color:var(--ink-3);margin-top:18px;
+    display:flex;flex-wrap:wrap;gap:6px 20px}
+
+  .verdict{margin:28px 0 8px;padding:18px 20px;border-radius:12px;border:1px solid var(--line);
+    background:var(--panel);border-left:4px solid var(--crit)}
+  .verdict b{color:var(--ink)}
+  .verdict .lead{font-size:15px}
+
+  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:24px 0 8px}
+  @media(max-width:680px){.cards{grid-template-columns:repeat(2,1fr)}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .card .k{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+  .card .v{font-family:var(--mono);font-size:26px;font-weight:650;margin-top:6px;letter-spacing:-.02em;
+    font-variant-numeric:tabular-nums}
+  .card .n{font-size:12px;color:var(--ink-2);margin-top:2px}
+  .v.crit{color:var(--crit)} .v.warn{color:var(--warn)} .v.good{color:var(--good)} .v.acc{color:var(--accent)}
+
+  figure{margin:8px 0 0}
+  .chart{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 16px 12px;
+    overflow-x:auto}
+  .chart svg{display:block;width:100%;height:auto;min-width:560px}
+  figcaption{font-size:13px;color:var(--ink-2);margin-top:12px;padding:0 4px}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-family:var(--mono);font-size:12px;color:var(--ink-2);
+    padding:0 4px 6px}
+  .legend i{display:inline-block;width:22px;height:0;vertical-align:middle;margin-right:7px;border-top-width:3px;border-top-style:solid}
+
+  table{width:100%;border-collapse:collapse;margin:6px 0;font-size:14px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line-2)}
+  th{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
+  td.num{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+  .tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+  .tbl-wrap table{margin:0}
+  .tbl-wrap th,.tbl-wrap td{padding:11px 14px}
+  tr.crit td:first-child{box-shadow:inset 3px 0 0 var(--crit)}
+  tr.good td:first-child{box-shadow:inset 3px 0 0 var(--good)}
+
+  .pill{display:inline-block;font-family:var(--mono);font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;letter-spacing:.03em}
+  .pill.crit{background:var(--crit-bg);color:var(--crit)} .pill.warn{background:var(--warn-bg);color:var(--warn)} .pill.good{background:var(--good-bg);color:var(--good)}
+
+  ol.fixes{list-style:none;counter-reset:f;padding:0;margin:8px 0;display:flex;flex-direction:column;gap:12px}
+  ol.fixes>li{counter-increment:f;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:16px 18px 16px 56px;position:relative}
+  ol.fixes>li::before{content:counter(f);position:absolute;left:16px;top:15px;width:26px;height:26px;
+    display:grid;place-items:center;border-radius:8px;background:var(--accent);color:#fff;
+    font-family:var(--mono);font-weight:700;font-size:14px}
+  ol.fixes h3{margin:0 0 4px;font-size:15.5px;font-weight:680}
+  ol.fixes p{margin:0;color:var(--ink-2);font-size:14px}
+  ol.fixes .tag{font-family:var(--mono);font-size:11px;color:var(--ink-3);margin-left:8px;font-weight:400}
+  .warnbox{margin-top:8px;padding:8px 12px;border-radius:8px;background:var(--warn-bg);color:var(--warn);
+    font-size:13px;border:1px solid transparent}
+  code{font-family:var(--mono);font-size:12.5px;background:var(--line-2);padding:1px 6px;border-radius:5px;color:var(--ink)}
+
+  .foot{margin-top:48px;padding-top:20px;border-top:1px solid var(--line);color:var(--ink-3);font-size:13px}
+  .foot ul{margin:8px 0 0;padding-left:18px} .foot li{margin:3px 0}
+  a{color:var(--accent)}
+</style>
+
+<div class="wrap">
+  <p class="eyebrow">Baguetteboost · 백엔드 부하테스트</p>
+  <h1>서버는 몇 명까지 버티는가 — 400명 램프 리포트</h1>
+  <p class="sub">치매 환자 모니터링 백엔드(FastAPI)에 환자 기기 + 보호자 앱 혼합 부하를 걸어 처리량 한계와 병목을 측정했다.</p>
+  <div class="meta">
+    <span>도구 Locust 2.45</span><span>부하 400 VUs · 램프 10/s · 5분</span>
+    <span>대상 uvicorn 1-worker</span><span>호스트 4 vCPU (co-located)</span>
+  </div>
+
+  <div class="verdict">
+    <p class="lead" style="margin:0"><b>결론.</b> 처리량은 <b>약 77 RPS에서 고정</b>되고, 그 지점(<b>동시 ~160명</b>)을 넘기면 사용자를 더 붙여도 처리량은 그대로인 채 <b>지연만 폭증</b>한다. 원인은 <b>단일 uvicorn 워커(코어 1개 포화)</b>와 <b>DB 커넥션 풀 고갈(30)</b>. AI 컨테이너는 병목이 아니다.</p>
+  </div>
+
+  <div class="cards">
+    <div class="card"><div class="k">처리량 한계</div><div class="v acc">77<span style="font-size:14px"> RPS</span></div><div class="n">~160명에서 무릎점</div></div>
+    <div class="card"><div class="k">건강 용량</div><div class="v good">~150<span style="font-size:14px"> 명</span></div><div class="n">p95 &lt; 200ms 기준</div></div>
+    <div class="card"><div class="k">400명 p95</div><div class="v crit">9.0<span style="font-size:14px"> s</span></div><div class="n">p50 3.6s · p99 13s</div></div>
+    <div class="card"><div class="k">실패율</div><div class="v warn">0.05<span style="font-size:14px"> %</span></div><div class="n">16,616건 중 9건</div></div>
+  </div>
+
+  <h2><span class="n">01</span>용량 곡선</h2>
+  <p class="sub">사용자 수를 10→400으로 올리며 측정한 순간 처리량(RPS)과 p95 지연. 처리량이 평평해지는 순간부터 지연이 하키스틱처럼 튄다.</p>
+  <div class="legend" style="margin-top:14px">
+    <span><i style="border-color:var(--accent)"></i>처리량 RPS (우축)</span>
+    <span><i style="border-color:var(--crit)"></i>p95 지연 (좌축, ms)</span>
+    <span><i style="border-color:var(--ink-3);border-top-style:dashed"></i>SLA 임계선</span>
+  </div>
+  <figure>
+    <div class="chart">
+      <svg viewBox="0 0 800 380" role="img" aria-label="사용자 수 대비 RPS와 p95 지연 곡선">
+        <!-- grid (latency scale: 0,1000,2000,3000ms) -->
+        <g stroke="var(--line)" stroke-width="1">
+          <line x1="56" y1="344" x2="776" y2="344"/>
+          <line x1="56" y1="237.3" x2="776" y2="237.3"/>
+          <line x1="56" y1="130.7" x2="776" y2="130.7"/>
+          <line x1="56" y1="24" x2="776" y2="24"/>
+        </g>
+        <!-- left axis labels (ms) -->
+        <g fill="var(--ink-3)" font-family="var(--mono)" font-size="11" text-anchor="end">
+          <text x="50" y="347">0</text><text x="50" y="241">1k</text>
+          <text x="50" y="134">2k</text><text x="50" y="28">3k</text>
+        </g>
+        <!-- right axis labels (RPS) -->
+        <g fill="var(--accent)" font-family="var(--mono)" font-size="11" text-anchor="start">
+          <text x="782" y="347">0</text><text x="782" y="188">40</text><text x="782" y="28">80</text>
+        </g>
+        <!-- x axis ticks -->
+        <g fill="var(--ink-3)" font-family="var(--mono)" font-size="11" text-anchor="middle">
+          <text x="56" y="362">0</text><text x="236" y="362">100</text>
+          <text x="416" y="362">200</text><text x="596" y="362">300</text><text x="776" y="362">400</text>
+          <text x="416" y="376" fill="var(--ink-2)">동시 사용자 수 (VUs)</text>
+        </g>
+        <!-- SLA threshold lines: 500ms (y=290.7), 1000ms (y=237.3) -->
+        <line x1="56" y1="290.7" x2="776" y2="290.7" stroke="var(--ink-3)" stroke-width="1" stroke-dasharray="5 4" opacity=".7"/>
+        <text x="60" y="286" fill="var(--ink-3)" font-family="var(--mono)" font-size="10">p95 0.5s</text>
+        <line x1="56" y1="237.3" x2="776" y2="237.3" stroke="var(--warn)" stroke-width="1" stroke-dasharray="5 4" opacity=".8"/>
+        <text x="60" y="233" fill="var(--warn)" font-family="var(--mono)" font-size="10">p95 1s</text>
+
+        <!-- p95 latency area + line -->
+        <polygon opacity=".10" fill="var(--crit)"
+          points="74,344 74,323.7 146,328 236,328 326,324.8 344,321.6 362,312 380,301.3 398,297.1 416,296 452,287.5 506,264 560,237.3 596,205.3 632,184 686,141.3 722,88 758,56 758,344"/>
+        <polyline fill="none" stroke="var(--crit)" stroke-width="2.5" stroke-linejoin="round"
+          points="74,323.7 146,328 236,328 326,324.8 344,321.6 362,312 380,301.3 398,297.1 416,296 452,287.5 506,264 560,237.3 596,205.3 632,184 686,141.3 722,88 758,56"/>
+        <!-- RPS line -->
+        <polyline fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"
+          points="74,316 146,264 236,224 326,168 344,152 362,140 380,128 398,112 416,104 452,80 506,56 560,36 596,32 632,32 686,36 722,36 758,48"/>
+
+        <!-- knee marker at ~160 users (x=344) -->
+        <line x1="344" y1="24" x2="344" y2="344" stroke="var(--accent)" stroke-width="1" stroke-dasharray="2 3" opacity=".55"/>
+        <circle cx="344" cy="152" r="4" fill="var(--accent)"/>
+        <text x="350" y="46" fill="var(--accent)" font-family="var(--mono)" font-size="10.5">무릎점 ~160명 · 77 RPS</text>
+        <!-- crossing markers -->
+        <circle cx="452" cy="287.5" r="3.5" fill="var(--crit)"/>
+        <text x="458" y="283" fill="var(--ink-2)" font-family="var(--mono)" font-size="10">~220명</text>
+        <circle cx="560" cy="237.3" r="3.5" fill="var(--warn)"/>
+        <text x="566" y="252" fill="var(--ink-2)" font-family="var(--mono)" font-size="10">~290명</text>
+      </svg>
+    </div>
+    <figcaption>램프 초반(≤150명)은 p95 &lt; 200ms로 평탄. ~160명에서 RPS가 77로 <b>포화</b>하고, 이후 사용자는 전부 큐 대기로 쌓여 p95가 0.5s(~220명)→1s(~290명)→9s(400명)로 튄다. 400명 최종 지점(p95 9s)은 축 밖이라 생략.</figcaption>
+  </figure>
+
+  <h2><span class="n">02</span>SLA별 용량 판정</h2>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>SLA 목표 (p95)</th><th>수용 동시 사용자</th><th>상태</th></tr></thead>
+      <tbody>
+        <tr><td>&lt; 200 ms</td><td class="num">~150</td><td><span class="pill good">권장 운영선</span></td></tr>
+        <tr><td>&lt; 500 ms</td><td class="num">~210</td><td><span class="pill warn">허용 한계</span></td></tr>
+        <tr><td>&lt; 1 s</td><td class="num">~280</td><td><span class="pill warn">체감 저하</span></td></tr>
+        <tr><td>그 이상</td><td class="num">400+</td><td><span class="pill crit">사용 불가</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2><span class="n">03</span>병목 지목 — 리소스 증거</h2>
+  <p class="sub">부하 중 컨테이너별 CPU와 DB 커넥션을 15초 간격으로 샘플링했다. 백엔드와 DB만 한계에 닿았다.</p>
+  <div class="tbl-wrap" style="margin-top:14px">
+    <table>
+      <thead><tr><th>자원</th><th>피크</th><th>판정</th></tr></thead>
+      <tbody>
+        <tr class="crit"><td>backend CPU</td><td class="num">104%</td><td><span class="pill crit">1차 병목</span> 단일 워커가 코어 1개 포화 (호스트 4코어 중 3개 유휴)</td></tr>
+        <tr class="crit"><td>DB 커넥션</td><td class="num">31</td><td><span class="pill crit">2차 병목</span> 풀 <code>pool_size 10 + overflow 20 = 30</code> 완전 고갈</td></tr>
+        <tr class="good"><td>ai-wander CPU</td><td class="num">12.7%</td><td><span class="pill good">여유</span> 배회 RF 추론 — 병목 아님</td></tr>
+        <tr class="good"><td>ai-fall CPU</td><td class="num">0.1%</td><td><span class="pill good">유휴</span> 낙상 TCN — 이벤트성이라 부하 낮음</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2><span class="n">04</span>해결방안 — 효과·순서 순</h2>
+  <ol class="fixes">
+    <li>
+      <h3>uvicorn 워커 다중화 <span class="tag">효과 ★★★ · 3코어 유휴</span></h3>
+      <p>단일 프로세스 → <b>4워커</b>로 코어를 모두 활용하면 처리량 ~3–4배(≈230–300 RPS). 다만 현재 앱은 단일 프로세스 전제라 그냥 켜면 깨진다.</p>
+      <div class="warnbox">⚠️ 선행 필요: <b>스케줄러</b>가 워커마다 돌아 알림이 4중 발송되고, <b>인메모리 GPS 버퍼</b>가 워커별로 갈라진다. → 스케줄러를 별도 프로세스로 분리 + 버퍼를 Redis 공유(또는 배회 detect를 DB 조회 기반)로 먼저 전환한 뒤 <code>gunicorn -k uvicorn.workers.UvicornWorker -w 4</code>.</div>
+    </li>
+    <li>
+      <h3>DB 커넥션 풀 상향 <span class="tag">효과 ★★ · 즉효·저위험</span></h3>
+      <p><code>database.py</code>의 <code>pool_size</code>/<code>max_overflow</code>를 올리고 MySQL <code>max_connections</code>(기본 151)와 함께 사이징. 4워커 기준 <b>워커당 풀 × 4 ≤ max_connections</b> (예: 워커당 15+15 → 총 120).</p>
+    </li>
+    <li>
+      <h3>배회 detect를 핑 경로에서 분리 <span class="tag">효과 ★★ · 쓰기경로 경량화</span></h3>
+      <p>지금은 <b>GPS 핑마다</b> 배회 AI를 백그라운드 호출 + DB 세션을 연다. 환자당 N핑/X초 <b>디바운스</b> 또는 스케줄러 주기 실행으로 옮기면 핑당 이벤트루프·DB 부하가 준다.</p>
+    </li>
+    <li>
+      <h3>폴링 → WebSocket 푸시 <span class="tag">효과 ★★ · 읽기부하 감소</span></h3>
+      <p>보호자 앱이 <code>/persons·/location·/alerts·/unread-count</code>를 1–2초마다 폴링(전체 요청의 ~절반). 푸시로 대체하거나 주기 상향 + <code>/alerts</code> 캐싱하면 같은 서버로 더 많은 보호자를 수용한다.</p>
+    </li>
+    <li>
+      <h3>수평 확장 <span class="tag">효과 ★★★ · 근본</span></h3>
+      <p>①~④로 앱이 프로세스-safe 해진 뒤 <b>백엔드 컨테이너 N개 + nginx/traefik 로드밸런서</b>, Redis로 버퍼·세션 공유 → 거의 선형 확장.</p>
+    </li>
+  </ol>
+
+  <div class="foot">
+    <b>방법론 · 한계</b>
+    <ul>
+      <li>혼합 부하: 환자 기기(무인증 GPS 핑 + 가끔 IMU 낙상) + 보호자 앱(로그인 후 조회 폴링). 시드 보호자 50 · 환자 200.</li>
+      <li>400명 중 실패 9건(0.05%)은 포화 말미의 연결 끊김 6 · GPS 500 1 · 기타 2 — 대부분 에러가 아니라 <b>지연</b>으로 나타났다.</li>
+      <li><b>공존 실행 주의:</b> locust·backend·db·AI가 같은 4코어 호스트에 함께 떠 CPU를 경쟁했다. 따라서 절대 수치(77 RPS·150명)는 <b>보수적 하한</b>이며, "단일 워커가 병목"이라는 <b>상대적 결론은 확고</b>하다.</li>
+      <li>재현: <code>loadtest/</code> — <code>seed_loadtest.py</code>, <code>locustfile.py</code>, <code>monitor.sh</code>, <code>results/</code>.</li>
+    </ul>
+  </div>
+</div>

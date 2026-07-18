@@ -45,7 +45,7 @@ services:
       baguetteboost-db:
         condition: service_healthy
 
-  # 낙상 전용 추론 컨테이너 (BinaryLSTM, iccas_final_lstm_imu_fall.pt)
+  # 낙상 전용 추론 컨테이너 (TCN, sisfall_global_tcn_imu_fall.pt, thr=0.58 체크포인트 내장)
   baguetteboost-ai-fall:
     build:
       # 컨텍스트는 repo 루트: ai-serve(우리 서버) + ai-model-release(팀원 원본 모델/스크립트) 둘 다 접근
@@ -53,7 +53,7 @@ services:
       dockerfile: ai-serve/Dockerfile
     environment:
       - TZ=UTC
-      - FALL_MODEL_PATH=models/iccas_finetuned_tcn_imu_fall.pt
+      - FALL_MODEL_PATH=models/sisfall_global_tcn_imu_fall.pt
       - WANDER_MODEL_PATH=            # 비움 → 배회 미로드(낙상 전용)
     container_name: baguetteboost-ai-fall
     restart: unless-stopped

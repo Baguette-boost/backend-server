@@ -39,12 +39,13 @@ bash monitor.sh
 | `BASE_URL` | `http://localhost:8000` | 대상 서버 |
 | `PERSON_ID_MIN/MAX` | `1000`/`1200` | 기기 액터 person_id 범위 (시드와 일치) |
 | `GUARDIAN_MIN/MAX` | `1`/`50` | 보호자 계정 인덱스 범위 |
-| `DEVICE_TOKEN` | `loadtest-device` | `Authorization: Device <token>` 값 |
+| `DEVICE_TOKEN_FMT` | `lt_tok_{}` | 기기 `device_token` 포맷(`{}`→person_id), `seed_loadtest.py`와 매칭 |
 | `FALL_RATE` | `0.02` | GPS 대비 낙상 전송 확률 |
 
-## 핵심 결과 (400명 램프)
-- 처리량은 **~77 RPS**에서 고정 → 동시 **~160명**이 무릎점.
-- 병목 = **단일 uvicorn 워커(CPU 1코어 포화)** + **DB 풀(30) 고갈**. AI 컨테이너는 여유.
+## 핵심 결과 (400명 램프, 2026-08-22 재측정 — 최초 07-18 대비 하락)
+- 처리량은 **~52 RPS**에서 정점(동시 **~210~240명**) → 400명 유지 5분 동안에도 안정화되지 않고 계속 하락(끝날 땐 ~32~40 RPS).
+- 병목 = **단일 uvicorn 워커(CPU 1코어 포화)** + **DB 풀(30) 고갈**(이번엔 `QueuePool timed out` 500 에러 29건까지 발생). AI 컨테이너는 여유.
+- 하락 원인: Issue #2에서 `device_token` 실제 DB 검증이 GPS/IMU 요청마다 추가돼 DB 풀 부담이 커짐. 상세·비교표는 `report.html` 참고.
 - SLA p95<200ms 기준 권장 용량 **~150명**. 자세한 분석과 해결방안은 `report.html`.
 
 > 주의: 부하생성기와 서버를 같은 호스트에서 돌리면 CPU 경쟁으로 수치가 낮게 나온다. 가능하면 부하생성기를 분리하라.

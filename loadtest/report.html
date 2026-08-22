@@ -96,27 +96,44 @@
 </style>
 
 <div class="wrap">
-  <p class="eyebrow">Baguetteboost · 백엔드 부하테스트</p>
+  <p class="eyebrow">Baguetteboost · 백엔드 부하테스트 · 2026-08-22 재측정</p>
   <h1>서버는 몇 명까지 버티는가 — 400명 램프 리포트</h1>
-  <p class="sub">치매 환자 모니터링 백엔드(FastAPI)에 환자 기기 + 보호자 앱 혼합 부하를 걸어 처리량 한계와 병목을 측정했다.</p>
+  <p class="sub">치매 환자 모니터링 백엔드(FastAPI)에 환자 기기 + 보호자 앱 혼합 부하를 걸어 처리량 한계와 병목을 측정했다. 최초 측정(2026-07-18) 이후 <code>device_token</code> 실제 DB 검증이 추가되며 용량이 눈에 띄게 낮아져 재측정했다.</p>
   <div class="meta">
-    <span>도구 Locust 2.45</span><span>부하 400 VUs · 램프 10/s · 5분</span>
+    <span>도구 Locust 2.46.3</span><span>부하 400 VUs · 램프 10/s · 5분</span>
     <span>대상 uvicorn 1-worker</span><span>호스트 4 vCPU (co-located)</span>
+    <span>측정일 2026-08-22 (최초 2026-07-18)</span>
   </div>
 
   <div class="verdict">
-    <p class="lead" style="margin:0"><b>결론.</b> 처리량은 <b>약 77 RPS에서 고정</b>되고, 그 지점(<b>동시 ~160명</b>)을 넘기면 사용자를 더 붙여도 처리량은 그대로인 채 <b>지연만 폭증</b>한다. 원인은 <b>단일 uvicorn 워커(코어 1개 포화)</b>와 <b>DB 커넥션 풀 고갈(30)</b>. AI 컨테이너는 병목이 아니다.</p>
+    <p class="lead" style="margin:0"><b>결론.</b> 처리량은 <b>~52 RPS</b> 부근에서 정점(동시 <b>~210~240명</b>)을 찍은 뒤, 400명까지는 물론 <b>400명을 5분간 유지하는 동안에도 안정화되지 않고 계속 하락</b>한다(정점 52 RPS → 5분 뒤 ~32~40 RPS). 원인은 이전과 동일한 <b>단일 uvicorn 워커(코어 1개 포화)</b> + <b>DB 커넥션 풀 고갈(30)</b>이지만, 이번엔 풀 고갈이 대기 지연을 넘어 <code>QueuePool ... connection timed out</code> <b>명시적 500 에러(29건)</b>로 실제 요청 실패를 냈다. AI 컨테이너는 여전히 병목이 아니다.</p>
   </div>
 
   <div class="cards">
-    <div class="card"><div class="k">처리량 한계</div><div class="v acc">77<span style="font-size:14px"> RPS</span></div><div class="n">~160명에서 무릎점</div></div>
-    <div class="card"><div class="k">건강 용량</div><div class="v good">~150<span style="font-size:14px"> 명</span></div><div class="n">p95 &lt; 200ms 기준</div></div>
-    <div class="card"><div class="k">400명 p95</div><div class="v crit">9.0<span style="font-size:14px"> s</span></div><div class="n">p50 3.6s · p99 13s</div></div>
-    <div class="card"><div class="k">실패율</div><div class="v warn">0.05<span style="font-size:14px"> %</span></div><div class="n">16,616건 중 9건</div></div>
+    <div class="card"><div class="k">처리량 한계</div><div class="v acc">52<span style="font-size:14px"> RPS</span></div><div class="n">~210~240명 정점 (이전 77 RPS·160명)</div></div>
+    <div class="card"><div class="k">건강 용량</div><div class="v good">~90<span style="font-size:14px"> 명</span></div><div class="n">p95 &lt; 200ms 기준 (이전 ~150명)</div></div>
+    <div class="card"><div class="k">400명 p95</div><div class="v crit">15<span style="font-size:14px"> s</span></div><div class="n">p50 6.0s · p99 23s (이전 9.0s/3.6s/13s)</div></div>
+    <div class="card"><div class="k">실패율</div><div class="v warn">0.27<span style="font-size:14px"> %</span></div><div class="n">11,681건 중 32건 (이전 0.05%)</div></div>
   </div>
 
+  <h2><span class="n">00</span>이전 측정(07-18) 대비 무엇이 달라졌나</h2>
+  <p class="sub">코드 변경 중 이 결과에 실질적 영향을 준 건 하나뿐이다 — 나머지(낙상 모델 교체, JWT 프로덕션 경로, 리포 위생 정리)는 이 테스트가 때리는 요청 경로와 무관하다.</p>
+  <div class="tbl-wrap" style="margin-top:14px">
+    <table>
+      <thead><tr><th>지표</th><th>이전 (07-18)</th><th>지금 (08-22)</th></tr></thead>
+      <tbody>
+        <tr><td>처리량 정점</td><td class="num">77 RPS</td><td class="num">52 RPS</td></tr>
+        <tr><td>SLA p95&lt;200ms 용량</td><td class="num">~150명</td><td class="num">~90명</td></tr>
+        <tr><td>400명 p50 / p95 / p99</td><td class="num">3.6s / 9.0s / 13s</td><td class="num">6.0s / 15s / 23s</td></tr>
+        <tr><td>실패율</td><td class="num">0.05%</td><td class="num">0.27%</td></tr>
+        <tr><td>정점 이후 거동</td><td>평평하게 안정(포화 상태 유지)</td><td><span class="pill crit">비안정</span> — 400명 유지 중에도 계속 악화</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="sub" style="margin-top:14px"><b>원인</b>: Issue #2에서 <code>verify_device_token()</code>이 DB 조회 없는 스텁 → 실제 <code>tracked_persons</code> 조회로 바뀌었다. GPS/IMU 요청(가장 트래픽이 많은 경로) <b>모두</b>에 DB 쿼리가 하나씩 추가된 셈이라, 이미 병목이었던 DB 풀(30)에 부담이 더 걸렸다. 단일 워커·풀 크기 등 구조 자체는 그대로라 "무엇이 병목인가"라는 정성적 결론은 그대로지만, 절대 수치는 이 결과가 더 신뢰할 수 있는 최신값이다.</p>
+
   <h2><span class="n">01</span>용량 곡선</h2>
-  <p class="sub">사용자 수를 10→400으로 올리며 측정한 순간 처리량(RPS)과 p95 지연. 처리량이 평평해지는 순간부터 지연이 하키스틱처럼 튄다.</p>
+  <p class="sub">사용자 수를 10→400으로 올리며 측정한 순간 처리량(RPS)과 p95 지연(램프 도달 직후 값). 처리량이 평평해지는 순간부터 지연이 하키스틱처럼 튄다 — 이번엔 그 뒤로도 계속 나빠진다(아래 캡션 참고).</p>
   <div class="legend" style="margin-top:14px">
     <span><i style="border-color:var(--accent)"></i>처리량 RPS (우축)</span>
     <span><i style="border-color:var(--crit)"></i>p95 지연 (좌축, ms)</span>
@@ -125,7 +142,7 @@
   <figure>
     <div class="chart">
       <svg viewBox="0 0 800 380" role="img" aria-label="사용자 수 대비 RPS와 p95 지연 곡선">
-        <!-- grid (latency scale: 0,1000,2000,3000ms) -->
+        <!-- grid (latency scale: 0,2000,4000,6000ms) -->
         <g stroke="var(--line)" stroke-width="1">
           <line x1="56" y1="344" x2="776" y2="344"/>
           <line x1="56" y1="237.3" x2="776" y2="237.3"/>
@@ -134,12 +151,12 @@
         </g>
         <!-- left axis labels (ms) -->
         <g fill="var(--ink-3)" font-family="var(--mono)" font-size="11" text-anchor="end">
-          <text x="50" y="347">0</text><text x="50" y="241">1k</text>
-          <text x="50" y="134">2k</text><text x="50" y="28">3k</text>
+          <text x="50" y="347">0</text><text x="50" y="241">2k</text>
+          <text x="50" y="134">4k</text><text x="50" y="28">6k</text>
         </g>
         <!-- right axis labels (RPS) -->
         <g fill="var(--accent)" font-family="var(--mono)" font-size="11" text-anchor="start">
-          <text x="782" y="347">0</text><text x="782" y="188">40</text><text x="782" y="28">80</text>
+          <text x="782" y="347">0</text><text x="782" y="188">30</text><text x="782" y="28">60</text>
         </g>
         <!-- x axis ticks -->
         <g fill="var(--ink-3)" font-family="var(--mono)" font-size="11" text-anchor="middle">
@@ -147,33 +164,33 @@
           <text x="416" y="362">200</text><text x="596" y="362">300</text><text x="776" y="362">400</text>
           <text x="416" y="376" fill="var(--ink-2)">동시 사용자 수 (VUs)</text>
         </g>
-        <!-- SLA threshold lines: 500ms (y=290.7), 1000ms (y=237.3) -->
-        <line x1="56" y1="290.7" x2="776" y2="290.7" stroke="var(--ink-3)" stroke-width="1" stroke-dasharray="5 4" opacity=".7"/>
-        <text x="60" y="286" fill="var(--ink-3)" font-family="var(--mono)" font-size="10">p95 0.5s</text>
-        <line x1="56" y1="237.3" x2="776" y2="237.3" stroke="var(--warn)" stroke-width="1" stroke-dasharray="5 4" opacity=".8"/>
-        <text x="60" y="233" fill="var(--warn)" font-family="var(--mono)" font-size="10">p95 1s</text>
+        <!-- SLA threshold lines: 500ms (y=317.3), 1000ms (y=290.7) -->
+        <line x1="56" y1="317.3" x2="776" y2="317.3" stroke="var(--ink-3)" stroke-width="1" stroke-dasharray="5 4" opacity=".7"/>
+        <text x="60" y="313" fill="var(--ink-3)" font-family="var(--mono)" font-size="10">p95 0.5s</text>
+        <line x1="56" y1="290.7" x2="776" y2="290.7" stroke="var(--warn)" stroke-width="1" stroke-dasharray="5 4" opacity=".8"/>
+        <text x="60" y="286" fill="var(--warn)" font-family="var(--mono)" font-size="10">p95 1s</text>
 
         <!-- p95 latency area + line -->
         <polygon opacity=".10" fill="var(--crit)"
-          points="74,344 74,323.7 146,328 236,328 326,324.8 344,321.6 362,312 380,301.3 398,297.1 416,296 452,287.5 506,264 560,237.3 596,205.3 632,184 686,141.3 722,88 758,56 758,344"/>
+          points="110,344 110,334.4 164,333.9 218,333.3 272,324.8 326,311.5 380,290.7 434,264 488,242.7 542,205.3 596,184 650,146.7 704,104 758,72 776,34.7 776,344"/>
         <polyline fill="none" stroke="var(--crit)" stroke-width="2.5" stroke-linejoin="round"
-          points="74,323.7 146,328 236,328 326,324.8 344,321.6 362,312 380,301.3 398,297.1 416,296 452,287.5 506,264 560,237.3 596,205.3 632,184 686,141.3 722,88 758,56"/>
+          points="110,334.4 164,333.9 218,333.3 272,324.8 326,311.5 380,290.7 434,264 488,242.7 542,205.3 596,184 650,146.7 704,104 758,72 776,34.7"/>
         <!-- RPS line -->
         <polyline fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"
-          points="74,316 146,264 236,224 326,168 344,152 362,140 380,128 398,112 416,104 452,80 506,56 560,36 596,32 632,32 686,36 722,36 758,48"/>
+          points="110,237.3 164,214.7 218,186.3 272,164.8 326,114.1 380,84.3 434,67.7 488,67.2 542,80.0 596,75.2 650,88.5 704,87.5 758,93.9 776,89.1"/>
 
-        <!-- knee marker at ~160 users (x=344) -->
-        <line x1="344" y1="24" x2="344" y2="344" stroke="var(--accent)" stroke-width="1" stroke-dasharray="2 3" opacity=".55"/>
-        <circle cx="344" cy="152" r="4" fill="var(--accent)"/>
-        <text x="350" y="46" fill="var(--accent)" font-family="var(--mono)" font-size="10.5">무릎점 ~160명 · 77 RPS</text>
+        <!-- knee marker at ~210-240 users (x=460) -->
+        <line x1="460" y1="24" x2="460" y2="344" stroke="var(--accent)" stroke-width="1" stroke-dasharray="2 3" opacity=".55"/>
+        <circle cx="460" cy="67.5" r="4" fill="var(--accent)"/>
+        <text x="466" y="46" fill="var(--accent)" font-family="var(--mono)" font-size="10.5">무릎점 ~210~240명 · ~52 RPS</text>
         <!-- crossing markers -->
-        <circle cx="452" cy="287.5" r="3.5" fill="var(--crit)"/>
-        <text x="458" y="283" fill="var(--ink-2)" font-family="var(--mono)" font-size="10">~220명</text>
-        <circle cx="560" cy="237.3" r="3.5" fill="var(--warn)"/>
-        <text x="566" y="252" fill="var(--ink-2)" font-family="var(--mono)" font-size="10">~290명</text>
+        <circle cx="302" cy="317.3" r="3.5" fill="var(--crit)"/>
+        <text x="230" y="313" fill="var(--ink-2)" font-family="var(--mono)" font-size="10">~137명</text>
+        <circle cx="380" cy="290.7" r="3.5" fill="var(--warn)"/>
+        <text x="386" y="306" fill="var(--ink-2)" font-family="var(--mono)" font-size="10">~180명</text>
       </svg>
     </div>
-    <figcaption>램프 초반(≤150명)은 p95 &lt; 200ms로 평탄. ~160명에서 RPS가 77로 <b>포화</b>하고, 이후 사용자는 전부 큐 대기로 쌓여 p95가 0.5s(~220명)→1s(~290명)→9s(400명)로 튄다. 400명 최종 지점(p95 9s)은 축 밖이라 생략.</figcaption>
+    <figcaption>램프 초반(≤90명)은 p95 &lt; 200ms로 평탄. ~210~240명에서 RPS가 ~52로 <b>포화</b>하고, 이후 사용자는 전부 큐 대기로 쌓여 p95가 0.5s(~137명)→1s(~180명)→5.8s(400명 램프 도달 직후)로 튄다. <b>차이점</b>: 이번엔 400명을 5분간 유지하는 동안에도 멈추지 않고 계속 나빠져 구간 종료 시점엔 처리량 ~32~40 RPS·p95 15s대까지 추가로 악화됐다(이 궤적은 VU 축 특성상 차트에 그릴 수 없어 수치로만 기록).</figcaption>
   </figure>
 
   <h2><span class="n">02</span>SLA별 용량 판정</h2>
@@ -181,10 +198,10 @@
     <table>
       <thead><tr><th>SLA 목표 (p95)</th><th>수용 동시 사용자</th><th>상태</th></tr></thead>
       <tbody>
-        <tr><td>&lt; 200 ms</td><td class="num">~150</td><td><span class="pill good">권장 운영선</span></td></tr>
-        <tr><td>&lt; 500 ms</td><td class="num">~210</td><td><span class="pill warn">허용 한계</span></td></tr>
-        <tr><td>&lt; 1 s</td><td class="num">~280</td><td><span class="pill warn">체감 저하</span></td></tr>
-        <tr><td>그 이상</td><td class="num">400+</td><td><span class="pill crit">사용 불가</span></td></tr>
+        <tr><td>&lt; 200 ms</td><td class="num">~90</td><td><span class="pill good">권장 운영선</span></td></tr>
+        <tr><td>&lt; 500 ms</td><td class="num">~137</td><td><span class="pill warn">허용 한계</span></td></tr>
+        <tr><td>&lt; 1 s</td><td class="num">~180</td><td><span class="pill warn">체감 저하</span></td></tr>
+        <tr><td>그 이상</td><td class="num">210+</td><td><span class="pill crit">사용 불가 (비안정)</span></td></tr>
       </tbody>
     </table>
   </div>
@@ -195,10 +212,11 @@
     <table>
       <thead><tr><th>자원</th><th>피크</th><th>판정</th></tr></thead>
       <tbody>
-        <tr class="crit"><td>backend CPU</td><td class="num">104%</td><td><span class="pill crit">1차 병목</span> 단일 워커가 코어 1개 포화 (호스트 4코어 중 3개 유휴)</td></tr>
-        <tr class="crit"><td>DB 커넥션</td><td class="num">31</td><td><span class="pill crit">2차 병목</span> 풀 <code>pool_size 10 + overflow 20 = 30</code> 완전 고갈</td></tr>
-        <tr class="good"><td>ai-wander CPU</td><td class="num">12.7%</td><td><span class="pill good">여유</span> 배회 RF 추론 — 병목 아님</td></tr>
-        <tr class="good"><td>ai-fall CPU</td><td class="num">0.1%</td><td><span class="pill good">유휴</span> 낙상 TCN — 이벤트성이라 부하 낮음</td></tr>
+        <tr class="crit"><td>backend CPU</td><td class="num">105%</td><td><span class="pill crit">1차 병목</span> 단일 워커가 코어 1개 포화 (호스트 4코어 중 3개 유휴) — 램프 시작 20초 만에 도달, 5분 내내 유지</td></tr>
+        <tr class="crit"><td>DB 커넥션</td><td class="num">31</td><td><span class="pill crit">2차 병목</span> 풀 <code>pool_size 10 + overflow 20 = 30</code> 완전 고갈, 5분 내내 지속</td></tr>
+        <tr class="crit"><td>DB 풀 타임아웃</td><td class="num">29건</td><td><span class="pill crit">신규 관측</span> <code>QueuePool limit ... connection timed out</code> → 명시적 <code>500</code> 에러로 이어짐 (이전 측정엔 없던 실패 유형)</td></tr>
+        <tr class="good"><td>ai-wander CPU</td><td class="num">5.6%</td><td><span class="pill good">여유</span> 배회 RF 추론 — 병목 아님</td></tr>
+        <tr class="good"><td>ai-fall CPU</td><td class="num">0.15%</td><td><span class="pill good">유휴</span> 낙상 TCN — 이벤트성이라 부하 낮음</td></tr>
       </tbody>
     </table>
   </div>
@@ -211,8 +229,8 @@
       <div class="warnbox">⚠️ 선행 필요: <b>스케줄러</b>가 워커마다 돌아 알림이 4중 발송되고, <b>인메모리 GPS 버퍼</b>가 워커별로 갈라진다. → 스케줄러를 별도 프로세스로 분리 + 버퍼를 Redis 공유(또는 배회 detect를 DB 조회 기반)로 먼저 전환한 뒤 <code>gunicorn -k uvicorn.workers.UvicornWorker -w 4</code>.</div>
     </li>
     <li>
-      <h3>DB 커넥션 풀 상향 <span class="tag">효과 ★★ · 즉효·저위험</span></h3>
-      <p><code>database.py</code>의 <code>pool_size</code>/<code>max_overflow</code>를 올리고 MySQL <code>max_connections</code>(기본 151)와 함께 사이징. 4워커 기준 <b>워커당 풀 × 4 ≤ max_connections</b> (예: 워커당 15+15 → 총 120).</p>
+      <h3>DB 커넥션 풀 상향 <span class="tag">효과 ★★ · 즉효·저위험 · 우선순위↑</span></h3>
+      <p><code>database.py</code>의 <code>pool_size</code>/<code>max_overflow</code>를 올리고 MySQL <code>max_connections</code>(기본 151)와 함께 사이징. 4워커 기준 <b>워커당 풀 × 4 ≤ max_connections</b> (예: 워커당 15+15 → 총 120). 이번 재측정에서 풀 고갈이 지연을 넘어 <code>QueuePool timed out</code> <b>500 에러 29건</b>으로 실제 요청 실패를 냈으므로, 다른 항목보다 먼저 처리할 가치가 있다.</p>
     </li>
     <li>
       <h3>배회 detect를 핑 경로에서 분리 <span class="tag">효과 ★★ · 쓰기경로 경량화</span></h3>
@@ -231,10 +249,11 @@
   <div class="foot">
     <b>방법론 · 한계</b>
     <ul>
-      <li>혼합 부하: 환자 기기(무인증 GPS 핑 + 가끔 IMU 낙상) + 보호자 앱(로그인 후 조회 폴링). 시드 보호자 50 · 환자 200.</li>
-      <li>400명 중 실패 9건(0.05%)은 포화 말미의 연결 끊김 6 · GPS 500 1 · 기타 2 — 대부분 에러가 아니라 <b>지연</b>으로 나타났다.</li>
-      <li><b>공존 실행 주의:</b> locust·backend·db·AI가 같은 4코어 호스트에 함께 떠 CPU를 경쟁했다. 따라서 절대 수치(77 RPS·150명)는 <b>보수적 하한</b>이며, "단일 워커가 병목"이라는 <b>상대적 결론은 확고</b>하다.</li>
-      <li>재현: <code>loadtest/</code> — <code>seed_loadtest.py</code>, <code>locustfile.py</code>, <code>monitor.sh</code>, <code>results/</code>.</li>
+      <li>혼합 부하: 환자 기기(device_token 인증 GPS 핑 + 가끔 IMU 낙상) + 보호자 앱(로그인 후 조회 폴링). 시드 보호자 50 · 환자 200. (07-18 최초 측정 당시는 device_token 검증이 스텁이라 사실상 무인증이었음 — 지금은 실제 DB 검증을 통과해야 한다.)</li>
+      <li>11,681건 중 실패 32건(0.27%): DB 풀 타임아웃(<code>500</code>) 29건 · 연결 끊김 8건 · 기타 <code>500</code> 3건 — 이번엔 <b>지연뿐 아니라 실제 에러</b>도 포함됐다.</li>
+      <li><b>공존 실행 주의:</b> locust·backend·db·AI가 같은 4코어 호스트에 함께 떠 CPU를 경쟁했다(07-18과 동일 조건). 따라서 절대 수치(52 RPS·90명)는 여전히 <b>보수적 하한</b>이며, "단일 워커+DB 풀이 병목"이라는 <b>상대적 결론은 확고</b>하다.</li>
+      <li><b>이 리포트가 "최신 상태"로 유효한 기간</b>: 다음에 telemetry 경로(GPS/IMU 수신)나 DB 풀 설정을 바꾸면 이 수치도 다시 stale해진다 — 그 시점에 재실행 권장.</li>
+      <li>재현: <code>loadtest/</code> — <code>seed_loadtest.py</code>, <code>locustfile.py</code>, <code>monitor.sh</code>. 원본 데이터는 <code>results/</code>(07-18, 접두어 없음)와 <code>results/20260822_*</code>(이번 재측정) 두 세트로 나란히 보관.</li>
     </ul>
   </div>
 </div>

@@ -1,0 +1,10 @@
+Method,Name,Error,Occurrences,First Seen,Last Seen
+GET,GET /persons/{id}/location,HTTPError('500 Server Error: Internal Server Error for url: GET /persons/{id}/location'),2,2026-08-22T19:08:50Z,2026-08-22T19:10:09Z
+GET,GET /persons,RemoteDisconnected('Remote end closed connection without response'),4,2026-08-22T19:07:41Z,2026-08-22T19:11:21Z
+GET,GET /alerts/unread-count,HTTPError('500 Server Error: Internal Server Error for url: GET /alerts/unread-count'),1,2026-08-22T19:11:00Z,2026-08-22T19:11:00Z
+POST,POST /telemetry/gps,RemoteDisconnected('Remote end closed connection without response'),8,2026-08-22T19:08:42Z,2026-08-22T19:12:02Z
+POST,POST /telemetry/gps,HTTPError('500 Server Error: Internal Server Error for url: POST /telemetry/gps'),11,2026-08-22T19:09:54Z,2026-08-22T19:11:59Z
+GET,GET /persons,HTTPError('500 Server Error: Internal Server Error for url: GET /persons'),1,2026-08-22T19:10:47Z,2026-08-22T19:10:47Z
+GET,GET /alerts,RemoteDisconnected('Remote end closed connection without response'),1,2026-08-22T19:09:01Z,2026-08-22T19:09:01Z
+GET,GET /persons/{id}/location,RemoteDisconnected('Remote end closed connection without response'),3,2026-08-22T19:08:58Z,2026-08-22T19:11:51Z
+GET,GET /alerts,HTTPError('500 Server Error: Internal Server Error for url: GET /alerts'),1,2026-08-22T19:11:11Z,2026-08-22T19:11:11Z

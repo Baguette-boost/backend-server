@@ -2,7 +2,7 @@
 Baguetteboost 백엔드 부하테스트 (Locust)
 
 두 종류의 가상 사용자를 동시에 돌려 "몇 명까지 버티는지"를 측정한다.
-  - DeviceUser  : 환자 기기. 무인증. GPS 핑(주기적) + 가끔 낙상 의심(IMU) 전송 [쓰기 경로]
+  - DeviceUser  : 환자 기기. device_token 인증(seed 된 환자별 토큰). GPS 핑(주기적) + 가끔 낙상 의심(IMU) 전송 [쓰기 경로]
   - GuardianUser: 보호자 앱/대시보드. 로그인 후 조회 API 폴링 [읽기 경로]
 
 실행 예:
@@ -17,6 +17,7 @@ Baguetteboost 백엔드 부하테스트 (Locust)
 환경변수:
   BASE_URL          대상 서버 (기본 http://localhost:8000)
   PERSON_ID_MIN/MAX 기기 액터가 사용할 person_id 범위 (미리 seed 필요)
+  DEVICE_TOKEN_FMT  기기 device_token 포맷 문자열, {}에 person_id 대입 (기본 "lt_tok_{}", seed_loadtest.py 와 매칭)
   GUARDIAN_PHONE_*  보호자 로그인 계정 패턴 (미리 seed 필요)
   FALL_RATE         GPS 핑 대비 낙상 전송 확률 (기본 0.02 = 2%)
 """
@@ -54,11 +55,14 @@ class DeviceUser(HttpUser):
     # 실제 주기를 재현하려면 between(18, 22) 로 바꾸고 사용자 수를 늘린다.
     wait_time = between(1, 3)
 
-    # verify_device_token 은 'Device <token>' 형식만 확인(현재 DB 검증 TODO).
-    DEVICE_HEADER = {"Authorization": "Device " + os.getenv("DEVICE_TOKEN", "loadtest-device")}
+    # verify_device_token 은 device_token 을 TrackedPerson.device_token 과 실제 대조하고,
+    # personId 소유자가 일치하는지도 검증한다. seed_loadtest.py 가 환자별로
+    # device_token='lt_tok_{person_id}' 를 심어두므로 가상유저마다 자신의 토큰을 써야 한다.
+    DEVICE_TOKEN_FMT = os.getenv("DEVICE_TOKEN_FMT", "lt_tok_{}")
 
     def on_start(self):
         self.person_id = random.randint(PERSON_ID_MIN, PERSON_ID_MAX)
+        self.device_header = {"Authorization": "Device " + self.DEVICE_TOKEN_FMT.format(self.person_id)}
 
     @task(50)
     def send_gps(self):
@@ -73,7 +77,7 @@ class DeviceUser(HttpUser):
             },
         }
         # name= 로 통계 라벨 고정(경로에 id가 없어 그대로지만 명시)
-        self.client.post("/telemetry/gps", json=body, headers=self.DEVICE_HEADER,
+        self.client.post("/telemetry/gps", json=body, headers=self.device_header,
                          name="POST /telemetry/gps")
 
     @task(1)
@@ -85,7 +89,7 @@ class DeviceUser(HttpUser):
             "timestamp": _now_iso(),
             "imuData": _imu_window(50),
         }
-        self.client.post("/telemetry/fall-suspect", json=body, headers=self.DEVICE_HEADER,
+        self.client.post("/telemetry/fall-suspect", json=body, headers=self.device_header,
                          name="POST /telemetry/fall-suspect")
 
 

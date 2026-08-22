@@ -32,7 +32,6 @@ logger = logging.getLogger(__name__)
 telemetry_router = APIRouter(
     prefix="/telemetry",
     tags=["Telemetry"],
-    dependencies=[Depends(verify_device_token)]
 )
 
 LAT_METER_PER_DEGREE = 111000.0
@@ -181,11 +180,16 @@ async def process_fall_suspect(person_id: int, recorded_at, imu_dict: dict, samp
 
 @telemetry_router.post("/gps", status_code=status.HTTP_201_CREATED) # POST /telemetry/gps
 async def receive_gps(
-    request: GPSRequest, 
+    request: GPSRequest,
     background_tasks: BackgroundTasks,
+    device_person_id: int = Depends(verify_device_token),
     db: AsyncSession = Depends(get_db)
 ):
     """ [디바이스 -> 서버] 주기적으로 전송되는 GPS 데이터 수신 → 버퍼 적재 및 AI 배회 분석 위임 """
+    # 토큰의 주인과 요청 바디의 personId 가 다르면(사칭) 차단
+    if device_person_id != request.personId:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Device token does not match personId.")
+
     # 직렬화를 위해 Pydantic 모델을 dict로 변환 (timestamp도 문자열로)
     gps_dict = request.gps.dict()
     gps_dict['timestamp'] = gps_dict['timestamp'].isoformat()
@@ -238,12 +242,17 @@ async def receive_gps(
 async def receive_fall_suspect(
     request: FallSuspectRequest,
     background_tasks: BackgroundTasks,
+    device_person_id: int = Depends(verify_device_token),
     db: AsyncSession = Depends(get_db)
 ):
     """
     [디바이스 -> 서버] 디바이스 자체 판단 하에 낙상 의심 시점의 IMU 데이터 수신
     (Background) AI 컨테이너로 IMU 및 누적 GPS 데이터를 묶어서 전송
     """
+    # 토큰의 주인과 요청 바디의 personId 가 다르면(사칭) 차단
+    if device_person_id != request.personId:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Device token does not match personId.")
+
     # 등록된 환자인지 검증 (미등록 personId의 낙상 데이터가 AI로 흘러가는 것을 차단)
     person = (
         await db.execute(

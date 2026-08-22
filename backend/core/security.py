@@ -122,7 +122,17 @@ device_token_scheme = APIKeyHeader(
     description="형식: Device <device_token>",
 )
 
-async def verify_device_token(authorization: str | None = Depends(device_token_scheme)):
+async def _find_person_by_device_token(device_token: str, db: AsyncSession) -> TrackedPerson | None:
+    """TrackedPerson.device_token 과 대조해 매핑된 person 을 반환(없으면 None)."""
+    stmt = select(TrackedPerson).where(TrackedPerson.device_token == device_token)
+    return (await db.execute(stmt)).scalar_one_or_none()
+
+
+async def verify_device_token(
+    authorization: str | None = Depends(device_token_scheme),
+    db: AsyncSession = Depends(get_db),
+) -> int:
+    """telemetry 라우터 인증 의존성. 유효한 device_token 이면 매핑된 person.id 를 반환한다."""
     if not authorization or not authorization.startswith("Device "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -130,17 +140,16 @@ async def verify_device_token(authorization: str | None = Depends(device_token_s
         )
 
     device_token = authorization.split(" ")[1]
-    # TODO: DB 조회를 통한 등록된 device_token 유효성 검증 로직 구현 예정
-    if device_token == "invalid-device-token":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unregistered Device")
+    person = await _find_person_by_device_token(device_token, db)
+    if person is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Device Token")
 
-    return {"device_id": "HW-DEV-001", "person_id": 1}
+    return person.id
 
 # 3. 디바이스 토큰 검증 헬퍼 (POST /persons/verify 전용) — 조회만 하고 부작용 없음
 async def verify_device_by_token(device_token: str, db: AsyncSession) -> int:
     """TrackedPerson.device_token과 대조해 매핑된 person.id를 반환. 검증 실패 시 400."""
-    stmt = select(TrackedPerson).where(TrackedPerson.device_token == device_token)
-    person = (await db.execute(stmt)).scalar_one_or_none()
+    person = await _find_person_by_device_token(device_token, db)
     if person is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Device Token")
     return person.id

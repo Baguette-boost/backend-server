@@ -1,6 +1,8 @@
 from fastapi import Depends, HTTPException, Header, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, APIKeyHeader
 import jwt
+import secrets
+from datetime import datetime, timedelta, timezone
 
 from passlib.context import CryptContext
 
@@ -60,18 +62,13 @@ def _parse_debug_token(token: str, expected_suffix: str) -> int:
 # 인증 조회 키 계약(Contract):
 #   - DEBUG      : 토큰 = "{guardian_id}_ACCESS" (더미). Guardian.access_token 컬럼과
 #                  정확히 일치하는 행을 조회한다(로그아웃 시 access_token=""로 무효화됨).
-#   - PRODUCTION : 토큰 = 진짜 JWT. payload["sub"] = phone 으로 Guardian을 조회한다.
-#                  ※ create_jwt_tokens가 아직 더미라 프로덕션 경로는 미완성(보류).
+#   - PRODUCTION : 토큰 = 진짜 서명된 JWT(exp 포함). payload["sub"] = phone 으로 Guardian을
+#                  조회한다(스테이트리스 — DB의 access_token 컬럼은 보지 않는다).
 # ─────────────────────────────────────────────────────────────────────────────
 
-# 1. 일반 유저 인증 의존성
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
-    db: AsyncSession = Depends(get_db)
-):
-    # Authorization: Bearer <token> 에서 토큰만 추출 (없으면 credentials=None)
-    token = credentials.credentials if credentials else None
-    # 토큰이 없으면 모드와 무관하게 401
+async def resolve_guardian_from_access_token(token: str, db: AsyncSession) -> Guardian:
+    """access_token 문자열로부터 Guardian을 조회한다. HTTP(get_current_user)와
+    WebSocket(/realtime)이 동일한 검증 로직을 쓰기 위해 공유하는 함수."""
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -111,6 +108,16 @@ async def get_current_user(
         raise HTTPException(status_code=401, detail="Guardian not found")
 
     return guardian
+
+
+# 1. 일반 유저 인증 의존성
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    db: AsyncSession = Depends(get_db)
+) -> Guardian:
+    # Authorization: Bearer <token> 에서 토큰만 추출 (없으면 credentials=None)
+    token = credentials.credentials if credentials else None
+    return await resolve_guardian_from_access_token(token, db)
 
 # 2. HW 디바이스 인증 의존성 (Authorization: Device <deviceToken>) — telemetry 라우터에서 사용
 # 일반 Header(...) 대신 APIKeyHeader 보안 스킴을 써야 Swagger Authorize에 입력칸이 노출되고
@@ -155,28 +162,59 @@ async def verify_device_by_token(device_token: str, db: AsyncSession) -> int:
     return person.id
 
 
-async def verify_refresh_token(refresh_token: str, db: AsyncSession) -> int:
+async def verify_refresh_token(refresh_token: str, db: AsyncSession) -> Guardian:
     """
-    [DEBUG] 더미 refresh 토큰 검증.
-    접미사(REFRESH) + id 파싱 후 Guardian.refresh_token == token 무효화 비교까지 수행한다
-    (로그아웃 시 refresh_token=""로 무효화되므로 재발급이 막힌다).
-    ※ 프로덕션(진짜 JWT) refresh 경로는 보류.
+    Refresh 토큰을 검증하고 매핑된 Guardian을 반환한다(재발급 시 phone 등 추가 조회 없이
+    바로 create_jwt_tokens에 넘기기 위해 int가 아닌 Guardian을 반환).
+
+    [DEBUG] 접미사(REFRESH) + id 파싱 후 Guardian.refresh_token == token 무효화 비교까지 수행.
+    [PRODUCTION] refresh_token은 서명 토큰이 아닌 불투명 랜덤값이라 접미사 파싱 없이
+    Guardian.refresh_token == token 으로 직접 대조한다.
+    로그아웃 시 refresh_token=""로 무효화되므로 두 모드 모두 재발급이 막힌다.
     """
-    guardian_id = _parse_debug_token(refresh_token, expected_suffix="REFRESH")
+    if DEBUG_MODE:
+        guardian_id = _parse_debug_token(refresh_token, expected_suffix="REFRESH")
+        stmt = select(Guardian).where(Guardian.refresh_token == refresh_token)
+        guardian = (await db.execute(stmt)).scalar_one_or_none()
+        if guardian is None or guardian.id != guardian_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired refresh token",
+            )
+        return guardian
+
     stmt = select(Guardian).where(Guardian.refresh_token == refresh_token)
     guardian = (await db.execute(stmt)).scalar_one_or_none()
-    if guardian is None or guardian.id != guardian_id:
+    if guardian is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired refresh token",
         )
-    return guardian.id
+    return guardian
 
 
-async def create_jwt_tokens(id: int):
-    # TODO: 디버그 동작 완성 후 프로덕션용 진짜 JWT 발급으로 교체 예정 (현재는 더미 토큰)
+def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
+    """서명된 JWT access token 을 발급한다(HS256, exp 포함)."""
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+async def create_jwt_tokens(guardian: Guardian) -> TokenResponse:
+    """DEBUG_MODE: 더미 토큰("{id}_ACCESS"/"{id}_REFRESH").
+    PRODUCTION: 서명된 JWT access token + 불투명 랜덤 refresh token."""
+    if DEBUG_MODE:
+        return TokenResponse(
+            access_token=f"{guardian.id}_ACCESS",
+            refresh_token=f"{guardian.id}_REFRESH",
+            token_type="Bearer",
+        )
+
+    access_token = create_access_token({"sub": guardian.phone})
+    refresh_token = secrets.token_urlsafe(32)
     return TokenResponse(
-        access_token=str(id) + "_ACCESS",
-        refresh_token=str(id) + "_REFRESH",
+        access_token=access_token,
+        refresh_token=refresh_token,
         token_type="Bearer",
     )

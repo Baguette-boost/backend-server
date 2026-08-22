@@ -1,34 +1,27 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from backend.core.websocket import manager
-from backend.core.security import get_current_user # 자체 구현된 JWT 검증 로직 임포트
+from backend.core.security import resolve_guardian_from_access_token # HTTP와 동일한 JWT 검증 로직 공유
+from backend.database import get_independent_session
 from backend.models.guardian import Guardian
 
 router = APIRouter()
-
-async def get_guardian_from_token(token: str) -> int:
-    """JWT 토큰에서 guardian_id를 추출하는 가상 함수"""
-    # payload = get_current_user(token)
-    # return payload.get("user_id")
-    
-    # 개발 및 테스트를 위해 임시로 토큰 자체를 ID로 사용 (예: ?token=1)
-    if token.isdigit():
-        return int(token)
-    raise ValueError("Invalid token")
 
 @router.websocket("/realtime")
 async def websocket_endpoint(websocket: WebSocket):
     # 커스텀 헤더에서 accessToken 추출
     # WebSocket은 초기 Handshake 시 headers를 가져올 수 있음
     access_token = websocket.headers.get("accessToken")
-    
+
     if not access_token:
         # 토큰이 없으면 연결 거부
-        await websocket.close(code=1008) 
+        await websocket.close(code=1008)
         return
-        
+
     try:
-        # 1. Bearer 토큰(여기서는 Query Param) 검증 및 ID 추출
-        guardian_id = await get_guardian_from_token(access_token)
+        # REST(get_current_user)와 동일한 검증 로직(DEBUG 더미 토큰 / production JWT)
+        async with get_independent_session() as db:
+            guardian = await resolve_guardian_from_access_token(access_token, db)
+        guardian_id = guardian.id
     except Exception:
         await websocket.close(code=1008) # Policy Violation
         return

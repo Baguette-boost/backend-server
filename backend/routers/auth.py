@@ -1,8 +1,6 @@
-from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Header, status
 
 from pydantic import BaseModel
-import jwt
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
@@ -10,20 +8,12 @@ from sqlalchemy import select, update
 from backend.database import get_db
 from backend.models.guardian import Guardian
 from backend.models.setting import UserSettings
-from backend.core.security import get_current_user, SECRET_KEY, ALGORITHM, DEBUG_MODE, create_jwt_tokens, verify_refresh_token, get_password_hash, verify_password # 해싱/검증 유틸
+from backend.core.security import get_current_user, DEBUG_MODE, create_jwt_tokens, verify_refresh_token, get_password_hash, verify_password # 해싱/검증 유틸
 from backend.schemas.guardian import TokenResponse, SignUpRequest, LoginRequest
 
 from typing import Annotated
 
 auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
-
-# Pydantic 스키마 정의
-
-def create_access_token(data: dict, expires_delta: timedelta | None = None):
-    to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta if expires_delta else timedelta(minutes=60))
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 @auth_router.post("/signup", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def signup(payload: SignUpRequest, db: AsyncSession = Depends(get_db)):
@@ -58,7 +48,7 @@ async def signup(payload: SignUpRequest, db: AsyncSession = Depends(get_db)):
     await db.commit()
 
     # 토큰 발행
-    tokens = await create_jwt_tokens(new_guardian.id)
+    tokens = await create_jwt_tokens(new_guardian)
 
     stmt = (
         update(Guardian)
@@ -98,12 +88,7 @@ async def login(login_data: LoginRequest, db: AsyncSession = Depends(get_db)):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # # JWT 발급
-    # access_token_expires = timedelta(minutes=60 * 24) # 24시간 넉넉하게
-    # access_token = create_access_token(
-    #     data={"sub": guardian.phone}, expires_delta=access_token_expires
-    # )
-    result = await create_jwt_tokens(guardian.id)
+    result = await create_jwt_tokens(guardian)
     stmt = (
         update(Guardian)
         .where(Guardian.id == guardian.id)
@@ -114,14 +99,21 @@ async def login(login_data: LoginRequest, db: AsyncSession = Depends(get_db)):
 
     return result
 
-    # return TokenResponse(access_token=access_token)
-
 @auth_router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(refresh_token: str = Header(...), db: AsyncSession = Depends(get_db)):
-    user_id = await verify_refresh_token(refresh_token, db)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
-    return await create_jwt_tokens(id=user_id)
+    # 실패 시 verify_refresh_token 내부에서 401을 raise 한다.
+    guardian = await verify_refresh_token(refresh_token, db)
+    tokens = await create_jwt_tokens(guardian)
+    # 새로 발급한 토큰을 저장해야 다음 refresh 호출에서 새 refresh_token이 유효하다
+    # (저장하지 않으면 회전된 토큰이 DB의 옛 값과 어긋나 다음 refresh가 항상 실패한다).
+    stmt = (
+        update(Guardian)
+        .where(Guardian.id == guardian.id)
+        .values(access_token=tokens.access_token, refresh_token=tokens.refresh_token)
+    )
+    await db.execute(stmt)
+    await db.commit()
+    return tokens
 
 @auth_router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(current_user: Annotated[Guardian, Depends(get_current_user)], db: AsyncSession = Depends(get_db)):

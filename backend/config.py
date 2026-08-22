@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     AI_FALL_URL: str = "http://baguetteboost-ai-fall:5000"
     AI_WANDER_URL: str = "http://baguetteboost-ai-wander:8000"
     AI_REQUEST_TIMEOUT: int = 5 # 타임아웃 5초 설정
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60  # Production JWT access token 만료(분)
     MYSQL_ROOT_PASSWORD: str
     MYSQL_DATABASE: str
     MYSQL_USER: str

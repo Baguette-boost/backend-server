@@ -17,7 +17,6 @@ from backend.models.telemetry import GpsLog
 from backend.schemas.ai import AIPredictRequest
 from backend.services.ai_client import ai_client
 from backend.utils.time import utcnow, isoformat_utc
-import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -25,63 +24,6 @@ logger = logging.getLogger(__name__)
 # 등록(setNotificationChannelAsync)해야 배너/헤드업으로 표시된다. 미지정 시 저importance
 # 기본 채널로 처리돼 앱 UI 배너가 뜨지 않는다. iOS 는 무시되는 필드라 안전하다.
 EXPO_ANDROID_CHANNEL_ID = "default"
-
-async def get_guardian_token_and_name(person_id: int) -> dict:
-    """환자 ID를 통해 보호자의 ID 및 Expo Push 토큰을 비동기로 안전하게 조회"""
-    async with get_independent_session() as db:
-        stmt = (
-            select(TrackedPerson.guardian_id, Guardian.expo_token)
-            .join(Guardian, TrackedPerson.guardian_id == Guardian.id)
-            .where(TrackedPerson.id == person_id)
-        )
-        res = await db.execute(stmt)
-        row = res.first()
-        if row:
-            return {"guardian_id": row[0], "expo_token": row[1]}
-    return None
-
-async def send_emergency_push(expo_token: str, elder_name: str, alert_type: str):
-    """ Expo Push API를 비동기(논블로킹)로 호출하여 실기기 알림을 전송하는 함수 """
-    if not expo_token or not expo_token.startswith("ExponentPushToken["):
-        logger.error(f"잘못된 Expo 토큰 형식입니다: {expo_token}")
-        return
-
-    expo_push_url = "https://exp.host/--/api/v2/push/send" # expo push service의 rest api 엔드포인트
-    
-    # 알림 타입에 따른 메시지 분기 (wandering / fall_detected / offline)
-    if alert_type == "fall_detected":
-        body_msg = "A fall has been detected. Please check immediately!"
-    elif alert_type == "wandering":
-        body_msg = "Wandering has been detected. Please check."
-    elif alert_type == "offline":
-        body_msg = "The device is offline. Please check the power."
-    else:
-        body_msg = "An emergency has been detected."
-
-    payload = {
-        "to": expo_token,
-        "sound": "default",
-        "title": f"🚨 Emergency Alert: {elder_name}",
-        "body": body_msg,
-        "priority": "high",
-        "channelId": EXPO_ANDROID_CHANNEL_ID,   # Android heads-up 표시용(미지정 시 배너 안 뜸)
-        "data": {"screen": "EmergencyMap", "alert_type": alert_type}
-    }
-
-    # 비동기 HTTP 클라이언트를 사용하여 메인 스레드 블로킹 방지
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.post(expo_push_url, json=payload, timeout=5.0)
-            result = response.json()
-            
-            # Expo 서버 자체는 200 OK를 주더라도, 내부 데이터에 에러가 있을 수 있음
-            if "data" in result and result["data"].get("status") == "error":
-                logger.error(f"Expo 푸시 발송 에러 (토큰 만료 등): {result['data'].get('details')}")
-            else:
-                logger.info(f"[{elder_name}] 푸시 발송 성공!")
-                
-        except httpx.RequestError as e:
-            logger.error(f"Expo API 네트워크 통신 에러: {str(e)}")
 
 class NotificationService:
     @staticmethod

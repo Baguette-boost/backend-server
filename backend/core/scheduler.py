@@ -10,7 +10,7 @@ from backend.database import get_independent_session
 from backend.models.person import TrackedPerson
 from backend.models.alert import AlertLog
 from backend.models.telemetry import GpsLog, ImuLog
-from backend.services.notification_service import NotificationService, get_guardian_token_and_name, send_emergency_push
+from backend.services.notification_service import NotificationService
 from backend.utils.time import utcnow
 from backend.utils.geo import clean_track, radius_of_gyration_m
 from backend.config import settings
@@ -81,25 +81,12 @@ async def monitor_device_heartbeats():
             )
             db.add(alert_log)         
 
-            # 보호자의 토큰 및 웹소켓 연동용 정보 조회
-            token_info = await get_guardian_token_and_name(person.id)
-            if token_info:
-                expo_token, guardian_id = token_info["expo_token"], token_info["guardian_id"]
-                
-                # (1) 웹소켓 대시보드 실시간 브로드캐스팅 가동
-                payload_data = {"id": alert_log.id, "type": "offline", "message": alert_msg}
-                asyncio.create_task(
-                    NotificationService.broadcast_event(
-                        db=db, guardian_id=guardian_id, event_type="alert",
-                        person_id=str(person.id), payload_data=payload_data, payload=None
-                    )
-                )
-                # (2) 분리된 웹훅 구조의 send_emergency_push 백그라운드 호출
-                asyncio.create_task(
-                    send_emergency_push(
-                        expo_token, person.name, "offline"
-                    )
-                )
+            # WebSocket(대시보드) + Expo Push(모바일)를 wandering/fall_detected 와 동일하게
+            # _notify() 단일 경로로 발송한다(예전엔 broadcast_event 의 Expo Push와
+            # send_emergency_push 가 중복 호출되어 offline 알림이 두 번 발송되고 있었다).
+            asyncio.create_task(
+                NotificationService._notify(person.id, person.guardian_id, "offline", alert_msg)
+            )
         
         await db.commit()
 

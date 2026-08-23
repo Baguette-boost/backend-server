@@ -18,7 +18,7 @@ from backend.models.person import TrackedPerson
 from backend.models.telemetry import GpsLog
 from backend.models.guardian import Guardian
 from backend.utils.time import to_naive_utc, utcnow, isoformat_utc
-from backend.core.websocket import manager
+from backend.core.websocket import publish as ws_publish
 from backend.core.scheduler import enroll_person_wandering
 from backend.config import settings
 import httpx
@@ -170,9 +170,9 @@ async def normalize_person_status(
     await db.commit()
     await db.refresh(person)
 
-    # 연결된 대시보드 세션 실시간 동기화(라이브 새로고침) — 미연결이면 무동작
+    # 연결된 대시보드 세션 실시간 동기화(라이브 새로고침) — 멀티워커에서도 팬아웃되도록 Redis Pub/Sub 발행
     try:
-        await manager.send_personal_message({
+        await ws_publish({
             "type": "status_update",
             "status": {
                 "personId": str(person_id),

@@ -40,10 +40,43 @@ services:
       - "8000:8000"
     networks:
       - baguetteboost-network
-    # mysql 컨테이너가 실행 후 'healthy' 상태일 때 백엔드 구동
+    # mysql 컨테이너가 실행 후 'healthy' 상태일 때, redis 는 기동 후 백엔드 구동
     depends_on:
       baguetteboost-db:
         condition: service_healthy
+      baguetteboost-redis:
+        condition: service_started
+
+  # 독립 스케줄러 프로세스 (Issue #4 2단계). backend와 같은 이미지를 재사용하되
+  # command 만 오버라이드 — 멀티워커(backend) 중복 실행을 피하려고 HTTP 서빙 없이 이것만 돈다.
+  baguetteboost-scheduler:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: ["python", "-m", "backend.scheduler_main"]
+    environment:
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+      - TZ=UTC
+    container_name: baguetteboost-scheduler
+    restart: always
+    env_file:
+      - .env
+    networks:
+      - baguetteboost-network
+    depends_on:
+      baguetteboost-db:
+        condition: service_healthy
+      baguetteboost-redis:
+        condition: service_started
+
+  # 멀티워커 간 공유 상태(GPS 버퍼, WebSocket Pub/Sub 팬아웃) 저장소
+  baguetteboost-redis:
+    image: redis:7-alpine
+    container_name: baguetteboost-redis
+    restart: unless-stopped
+    networks:
+      - baguetteboost-network
 
   # 낙상 전용 추론 컨테이너 (TCN, sisfall_global_tcn_imu_fall.pt, thr=0.58 체크포인트 내장)
   baguetteboost-ai-fall:

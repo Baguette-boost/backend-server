@@ -1,0 +1,7 @@
+Method,Name,Error,Occurrences,First Seen,Last Seen
+GET,GET /persons,RemoteDisconnected('Remote end closed connection without response'),31,2026-08-23T15:23:28Z,2026-08-23T15:27:50Z
+POST,POST /telemetry/gps,RemoteDisconnected('Remote end closed connection without response'),287,2026-08-23T15:23:17Z,2026-08-23T15:28:01Z
+GET,GET /alerts,RemoteDisconnected('Remote end closed connection without response'),25,2026-08-23T15:23:44Z,2026-08-23T15:27:35Z
+GET,GET /persons/{id}/location,RemoteDisconnected('Remote end closed connection without response'),29,2026-08-23T15:24:02Z,2026-08-23T15:27:38Z
+GET,GET /alerts/unread-count,RemoteDisconnected('Remote end closed connection without response'),24,2026-08-23T15:23:34Z,2026-08-23T15:27:55Z
+GET,GET /persons/{id}/history,RemoteDisconnected('Remote end closed connection without response'),13,2026-08-23T15:23:43Z,2026-08-23T15:27:48Z

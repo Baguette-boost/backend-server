@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     AI_FALL_URL: str = "http://baguetteboost-ai-fall:5000"
     AI_WANDER_URL: str = "http://baguetteboost-ai-wander:8000"
     AI_REQUEST_TIMEOUT: int = 5 # 타임아웃 5초 설정
+    # 멀티워커 간 공유 상태(GPS 버퍼, WebSocket Pub/Sub 팬아웃)용
+    REDIS_URL: str = "redis://baguetteboost-redis:6379/0"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60  # Production JWT access token 만료(분)
     MYSQL_ROOT_PASSWORD: str
     MYSQL_DATABASE: str

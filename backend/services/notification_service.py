@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 from exponent_server_sdk import PushClient, PushMessage, PushServerError
 
-from backend.core.websocket import manager
+from backend.core.websocket import manager, publish as ws_publish
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -143,7 +143,9 @@ class NotificationService:
                 "read": False,
             },
         }
-        ws_task = manager.send_personal_message(ws_payload, guardian_id)
+        # 멀티워커에서 어느 워커가 이 코드를 실행하든 소켓이 붙은 워커로 팬아웃되도록
+        # 로컬 전송(manager.send_personal_message) 대신 Redis Pub/Sub로 발행한다.
+        ws_task = ws_publish(ws_payload, guardian_id)
         async with get_independent_session() as db:
             expo_task = NotificationService._send_expo_push(db, guardian_id, {"type": alert_type})
             results = await asyncio.gather(ws_task, expo_task, return_exceptions=True)

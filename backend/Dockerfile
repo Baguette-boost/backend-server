@@ -31,5 +31,7 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# 컨테이너 실행 명령어(FastAPI를 uvicorn으로 구동)
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--app-dir", "backend"]
+# 컨테이너 실행 명령어(gunicorn + UvicornWorker 4개 — Issue #4 2단계, 단일 워커 CPU 포화 해소)
+# --chdir backend 는 기존 uvicorn --app-dir backend 와 동일 역할(PYTHONPATH=/app 은 그대로라 backend.xxx 임포트는 안 깨짐).
+# baguetteboost-scheduler 서비스는 docker-compose.yml 에서 command 를 오버라이드해 이 이미지를 재사용한다.
+CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "-w", "4", "--chdir", "backend", "--bind", "0.0.0.0:8000", "main:app"]

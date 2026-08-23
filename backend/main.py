@@ -1,12 +1,14 @@
 from fastapi import FastAPI, Depends
 from collections import deque
 from typing import Dict
+import asyncio
 import time
 
 from contextlib import asynccontextmanager
-from backend.core.scheduler import start_scheduler, stop_scheduler
 from backend.services.ai_client import ai_client
 from backend.core.security import get_current_user
+from backend.core import redis_client
+from backend.core.websocket import start_redis_listener
 
 from backend.routers.realtime import router
 from backend.routers.auth import auth_router
@@ -64,22 +66,27 @@ logger = logging.getLogger("uvicorn") # 통합 로거 사용
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 1. 백그라운드 스케줄러 시작(AI 연결보다 먼저 가동 -> 의존성 분리)
-    logger.info("FastAPI Lifespan: 백그라운드 스케줄러를 시작합니다.")
-    start_scheduler()
-    
+    # 스케줄러(하트비트/낙상판정/배회enroll)는 멀티워커 중복 실행을 피하기 위해
+    # 이 프로세스가 아니라 별도 baguetteboost-scheduler 서비스(backend/scheduler_main.py)에서만 돈다.
+
+    # 1. Redis 클라이언트 시작(GPS 버퍼 + WebSocket Pub/Sub 팬아웃이 공유)
+    logger.info("FastAPI Lifespan: Redis 클라이언트를 시작합니다.")
+    redis_client.start()
+    ws_listener_task = asyncio.create_task(start_redis_listener())
+
     # 2. AI HTTP 클라이언트 시작
     try:
         logger.info("FastAPI Lifespan: AI 클라이언트 연결을 시도합니다.")
         ai_client.start()  # 동기 메서드 — await 하면 'NoneType await' 에러
     except Exception as e:
-        logger.error(f"AI 컨테이너 연결 실패 (스케줄러는 정상 가동 유지됨): {e}")    
-    
+        logger.error(f"AI 컨테이너 연결 실패: {e}")
+
     yield # 서버 실행 중
-    
-    # 4. 우아한 종료 (Graceful Shutdown)
-    stop_scheduler()
+
+    # 3. 우아한 종료 (Graceful Shutdown)
+    ws_listener_task.cancel()
     await ai_client.stop()
+    await redis_client.stop()
 
 app = FastAPI(lifespan=lifespan, title="Baguetteboost Backend", version="1.0.0")
 

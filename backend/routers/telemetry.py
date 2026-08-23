@@ -216,14 +216,14 @@ async def receive_gps(
 
     # 수신 데이터 버퍼 적재 및 AI(배회) 분석 위임
 
-    # 인메모리 전역 deque 버퍼에 즉시 적재 (가장 오래된 데이터는 자동 pop)
-    add_gps_to_buffer(request.personId, gps_dict)
-    
+    # Redis 버퍼에 즉시 적재 (가장 오래된 데이터는 자동 트림 — 멀티워커에서도 공유됨)
+    await add_gps_to_buffer(request.personId, gps_dict)
+
     # 2. DB Insert는 백그라운드로 넘겨 API 응답 속도 최적화
     background_tasks.add_task(async_insert_gps_log, request.personId, gps_dict)
 
     # AI 분석용 payload 구성 (datetime 객체를 그대로 전달)
-    gps_list = get_patient_gps_history(request.personId)
+    gps_list = await get_patient_gps_history(request.personId)
 
     payload = AIPredictRequest(
         personId=request.personId,
@@ -265,7 +265,7 @@ async def receive_fall_suspect(
 
     try:
         imu_dict = request.imuData.dict()
-        gps_list = get_patient_gps_history(request.personId)
+        gps_list = await get_patient_gps_history(request.personId)
 
         # AI 서버 규약에 맞게 페이로드 구성
         # datetime 객체를 그대로 전달한다. (문자열로 isoformat()+'Z' 하면 tz-aware 입력에서

@@ -27,13 +27,13 @@ ICCAS 2026 발표 프로젝트(팀명 Baguette Boost / 서비스명 Voost)이며
 | 하드웨어 | ESP32 기반 스마트 조끼 — IMU(가속도·자이로) + GPS 모듈 |
 | 감지 대상 | **배회**(GPS 궤적 이상), **낙상**(IMU 급변) |
 | 알림 채널 | 보호자 앱 WebSocket(실시간 대시보드) + Expo Push(모바일 푸시) |
-| 배포 단위 | Docker Compose 4-컨테이너: MySQL · Backend(FastAPI) · AI-낙상(TCN) · AI-배회(환자별 RF) |
+| 배포 단위 | Docker Compose 6-컨테이너: MySQL · Redis · Backend(FastAPI, gunicorn 4워커) · Scheduler(독립 프로세스) · AI-낙상(TCN) · AI-배회(환자별 RF) |
 
 ### 전체 데이터 흐름
 
 ```
 ESP32 조끼
-  ├─ 10초 주기 GPS ──► POST /telemetry/gps ──► 인메모리 버퍼(15분) ──► AI-배회(RF) ──► 배회 시 알림
+  ├─ 10초 주기 GPS ──► POST /telemetry/gps ──► Redis 버퍼(15분) ──► AI-배회(RF) ──► 배회 시 알림
   └─ 가속도 임계치 초과 시
      직전10초+직후2초 IMU ──► POST /telemetry/fall-suspect ──► AI-낙상(TCN) ──► 낙상 시 알림
 
@@ -52,14 +52,16 @@ GPS 경로는 **배회만**, IMU 경로는 **낙상만** 판정합니다(두 파
 
 ```
 backend-server/
-├── backend/                  # FastAPI 애플리케이션 (이 레포의 핵심)
-│   ├── main.py                #   앱 진입점, lifespan(스케줄러/AI 클라이언트 기동)
+├── backend/                  # FastAPI 애플리케이션 (이 레포의 핵심, gunicorn 4워커로 서빙)
+│   ├── main.py                #   앱 진입점, lifespan(Redis/AI 클라이언트 기동 — 스케줄러는 없음)
+│   ├── scheduler_main.py       #   독립 스케줄러 프로세스 진입점(baguetteboost-scheduler 서비스)
 │   ├── config.py               #   pydantic-settings 기반 환경설정 단일 소스
 │   ├── database.py             #   비동기 SQLAlchemy 엔진/세션 팩토리
 │   ├── routers/                 #   HTTP 엔드포인트 (auth, persons, telemetry, alerts, guardians, realtime)
 │   ├── services/                 #   ai_client(AI 컨테이너 호출), notification_service(WS+Push 통합 발송)
-│   ├── core/                      #   buffer(환자별 GPS 인메모리 버퍼), scheduler(APScheduler 잡),
-│   │                               #   security(인증/인가), websocket(연결 매니저)
+│   ├── core/                      #   buffer(GPS 버퍼, Redis 리스트), scheduler(APScheduler 잡),
+│   │                               #   security(인증/인가), websocket(연결 매니저+Redis Pub/Sub 팬아웃),
+│   │                               #   redis_client(공유 Redis 클라이언트)
 │   ├── models/                     #   SQLAlchemy ORM 모델
 │   ├── schemas/                     #   Pydantic 요청/응답 스키마
 │   └── utils/                        #   time(UTC 변환 유틸), geo(회전반경 계산)
@@ -76,7 +78,7 @@ backend-server/
 ├── loadtest/                  # Locust 기반 부하테스트 도구 + 결과 리포트
 ├── tests/                     # pytest (Expo Push 등 유닛 테스트)
 ├── scripts/                   # 보조 스크립트 (더미 GPS 트랙 생성기 등)
-├── docker-compose.yml         # 4-컨테이너 오케스트레이션
+├── docker-compose.yml         # 6-컨테이너 오케스트레이션(db·redis·backend·scheduler·ai-fall·ai-wander)
 ├── API.md                     # API 상세 레퍼런스 (실제 구현 기준)
 ├── API.prev.md                # 예전 기획 단계 API 문서 (참고용 — 구현과 다른 부분 많음)
 └── README.md                  # 이 문서
@@ -106,25 +108,31 @@ curl http://localhost:8000/health
 
 ## 아키텍처 & 기술 스택
 
-### 왜 3(4)-컨테이너로 나눴는가
+### 왜 6-컨테이너로 나눴는가
 
 ```
 ┌─────────────────┐      ┌──────────────────────┐
 │  baguetteboost-  │──┬──►│ baguetteboost-ai-fall │  TCN(PyTorch), personId별 아니라
-│    backend       │  │   │  POST /predict        │  전역 모델 1개 (Case 3 참고)
-│   (FastAPI)      │  │   └──────────────────────┘
-│                  │  │
+│  backend         │  │   │  POST /predict        │  전역 모델 1개 (Case 3 참고)
+│  (FastAPI,       │  │   └──────────────────────┘
+│   gunicorn 4워커) │  │
 │                  │  └──►┌──────────────────────┐
 │                  │      │ baguetteboost-ai-wander│  환자별 RandomForest(.joblib),
 │                  │      │  POST /users/{id}/detect│ /data 볼륨에 영속
 │                  │      └──────────────────────┘
-└────────┬─────────┘
-         │
-         ▼
-┌─────────────────┐
-│ baguetteboost-db │  MySQL 8
-└─────────────────┘
+└──┬───────────┬───┘
+   │           │
+   ▼           ▼
+┌─────────┐ ┌───────────────────┐      ┌────────────────────────┐
+│ baguette│ │ baguetteboost-redis│◄────►│ baguetteboost-scheduler │
+│ boost-db│ │ GPS 버퍼(리스트) +  │      │ 독립 프로세스(HTTP 없음) │
+│ MySQL 8 │ │ WS 알림 Pub/Sub    │      │ 하트비트·낙상판정·배회enroll│
+└─────────┘ └───────────────────┘      └────────────────────────┘
 ```
+
+4워커로 가면서 프로세스 메모리에만 있던 상태(GPS 버퍼, 스케줄러, WebSocket 연결 목록)가
+워커마다 갈라지는 문제가 생겨, Redis를 공유 저장소로 두고 스케줄러를 아예 별도 프로세스로
+뺐습니다(자세한 배경은 [트러블슈팅 3](#3-부하테스트로-드러난-db-커넥션-풀-고갈) 참고).
 
 - **AI 컨테이너를 분리한 이유**: 팀원이 소유한 모델 코드(`wandering_detector/`,
   `ai-model-release/`)를 백엔드가 **무수정**으로 그대로 실행하기 위해서입니다. 백엔드가
@@ -145,7 +153,8 @@ curl http://localhost:8000/health
 | 웹 프레임워크 | **FastAPI** | 센서 데이터가 초당 다건 유입되는 I/O-bound 워크로드라 `async def` 네이티브 지원이 중요했고, Pydantic 기반 요청 검증(IMU 9채널 길이 일치 등)을 라우터 코드 없이 스키마로 강제할 수 있음 |
 | DB 드라이버 | **SQLAlchemy(async) + aiomysql** | AI 추론 대기(최대 5초 타임아웃) 동안 커넥션을 물고 있지 않도록 비동기로 처리해야 커넥션 풀이 고갈되지 않음 — 이 원칙이 지켜지지 않았을 때 벌어진 일은 [트러블슈팅 3](#3-부하테스트로-드러난-db-커넥션-풀-고갈) 참고 |
 | DB | **MySQL 8** | GPS/IMU 시계열이 `(person_id, created_at)` 복합 인덱스로 조회되는 패턴이 명확해 관계형 DB로 충분했고, 팀 내 운영 경험이 있어 선택 |
-| 스케줄링 | **APScheduler(in-process)** | 하트비트(오프라인 판정)·낙상 부동판정(1분 주기)·배회 개인모델 자동 enroll(1일 1회) 등 백그라운드 잡이 모두 "이 프로세스가 살아있는 동안 도는 가벼운 폴링"이라 별도 워커/큐(Celery 등)를 두는 비용이 배보다 배꼽이 컸음 |
+| 스케줄링 | **APScheduler**(독립 프로세스) | 하트비트(오프라인 판정)·낙상 부동판정(1분 주기)·배회 개인모델 자동 enroll(1일 1회) 등 가벼운 백그라운드 폴링이라 Celery 같은 별도 큐는 과했지만, 멀티워커 전환 후엔 "가벼우니 프로세스에 얹어둔다"가 아니라 워커 수와 무관하게 정확히 1개만 돌아야 해서 `backend/scheduler_main.py`로 분리(자세한 배경은 [트러블슈팅 3](#3-부하테스트로-드러난-db-커넥션-풀-고갈)) |
+| 공유 상태 | **Redis**(GPS 버퍼 + WebSocket Pub/Sub) | gunicorn 멀티워커 전환 시 GPS 버퍼·WebSocket 연결 목록이 프로세스(워커)마다 갈라지는 문제가 생겨 도입. 버퍼는 리스트로, 워커 간 알림 팬아웃은 Pub/Sub으로 — 둘 다 원래 있던 기능을 프로세스 밖으로 옮긴 것이라 새 요구사항이 생긴 건 아님 |
 | 실시간 알림 | **WebSocket(대시보드) + Expo Push(모바일)** | 보호자가 앱을 보고 있으면 WS로 즉시, 안 보고 있으면 푸시로 깨워야 해서 두 채널을 병행. 하나의 이벤트(`NotificationService._notify`)에서 두 채널을 함께 쏘도록 통일 — 그렇지 않았을 때 실제로 offline 알림이 이중 발송되는 버그가 있었고, 이 통합 과정에서 함께 수정([`a8cdbda`](https://github.com/Baguette-boost/backend-server/commit/a8cdbda)) |
 | 컨테이너 오케스트레이션 | **Docker Compose** | 단일 서버에 배포되는 규모(대회/프로토타입)라 Kubernetes는 과했고, `depends_on` + `healthcheck`만으로 기동 순서(DB → 백엔드 → AI)를 충분히 보장 |
 
@@ -314,20 +323,42 @@ GPS/IMU 텔레메트리는 서버에서 가장 트래픽이 큰 경로인데, �
 단일 uvicorn 워커(CPU 1코어 포화)까지 겹쳐 있어, 보안 수정 하나가 처리량 병목의 트리거가
 됐습니다.
 
-**해결책 (진행 중 — [Issue #4](https://github.com/Baguette-boost/backend-server/issues/4))**
-아래 우선순위로 정리해 이슈로 남기고, 다른 작업(포트폴리오 문서화 등) 완료 후 착수 예정입니다.
-1. DB 커넥션 풀 크기 상향(가장 직접적인 원인 해소)
-2. uvicorn multi-worker 전환
-3. GPS 핑 경로에서 배회 판정을 분리(매 핑마다 AI 호출하지 않도록)
-4. 보호자 앱 폴링을 WebSocket 푸시로 전환해 읽기 트래픽 자체를 줄임
+**해결책([Issue #4](https://github.com/Baguette-boost/backend-server/issues/4)) — 1차 시도는 틀렸고, 그 실패가 진짜 원인을 알려줬습니다**
+
+1순위로 꼽았던 "DB 커넥션 풀 상향"(`pool_size 10→70, max_overflow 20→30`)을 먼저 실행하고
+재측정했더니, 오히려 처리량이 **52→29 RPS**로 더 떨어지고 `QueuePool timed out`도 재발했습니다.
+모니터링을 보니 DB CPU는 그때도 여유(12~17%)였고 **backend CPU만 그대로 1코어 포화**
+상태였습니다 — 즉 병목은 처음부터 DB가 아니라 CPU였고, 원래의 작은 풀은 초과 요청을 빨리
+실패시키는 일종의 백프레셔였는데 그걸 치우자 순수하게 손해였던 것입니다. 풀 크기는 원복하고,
+진짜 원인인 **단일 uvicorn 워커**로 방향을 바꿨습니다.
+
+`gunicorn -k uvicorn.workers.UvicornWorker -w 4`로 전환하되, 그 전에 멀티워커에서 깨지는
+세 가지 프로세스-로컬 상태를 먼저 없애야 했습니다:
+- GPS 인메모리 버퍼(`core/buffer.py`) → **Redis 리스트**로 전환(워커마다 버퍼가 조각나 배회
+  판정이 깨지는 문제)
+- 스케줄러(하트비트/낙상판정/배회enroll) → 워커와 무관하게 항상 1개만 도는 **별도 프로세스**
+  (`baguetteboost-scheduler`)로 분리(워커 수만큼 중복 실행되어 알림이 N중 발송되는 문제)
+- WebSocket 알림 → **Redis Pub/Sub 팬아웃**으로 전환(소켓이 붙은 워커와 알림이 발생한 워커가
+  달라 대시보드 실시간 갱신이 조용히 누락되는 문제 — Expo 푸시는 DB 조회 기반이라 원래도
+  안전했지만, 대시보드 즉시성은 워커 확률에 좌우되고 있었습니다)
+
+**결과**: 처리량 52→**75 RPS**(평균, 램프 중 피크 ~90 RPS), 400명 p95 15s→**5.1s**,
+`QueuePool` 타임아웃 29건→**0건**. 다만 SLA(p95<200ms) 기준 권장 용량은 ~90명으로
+**개선되지 않았고**, 실패율도 0.27%→1.81%로 소폭 늘었습니다(단 원인은 DB 타임아웃이 아니라
+`RemoteDisconnected` — 같은 4코어 호스트에서 부하생성기와 서버가 경쟁하는 테스트 환경
+특성으로 추정, 확정은 아님). 남은 항목(배회 detect를 GPS 핑 경로에서 분리, 폴링→WebSocket
+전환)은 계속 진행 예정입니다.
 
 **성과 / 배운 점**
 - "보안 수정은 공짜가 아니다" — 인증 강화가 가장 트래픽이 큰 경로에 DB 조회를 추가하는
   변경이라면, 그 대가를 수치로 미리 확인해야 한다는 걸 재확인했습니다.
+- **"그럴듯한 1순위"가 틀릴 수 있다** — 이슈에 "즉효·저위험"으로 적어뒀던 DB 풀 상향이
+  실제로는 역효과였습니다. 모니터링 지표(CPU가 DB가 아니라 backend에서 포화)가 없었다면
+  틀린 방향으로 더 밀어붙였을 것입니다 — 추측 대신 리소스별 지표로 병목을 특정하는 습관이
+  중요하다는 걸 실측으로 재확인했습니다.
 - 부하테스트를 "한 번 재고 끝"이 아니라 **회귀 감지용으로 반복 실행**해야 의미가 있다는 것도
-  이번에 체감했습니다 — 동일 절차(`loadtest/README.md`)로 재측정하지 않았다면 이 하락을
-  놓쳤을 것입니다. 최신 수치와 SVG 시각화는 [`loadtest/report.html`](loadtest/report.html)에
-  있습니다.
+  이번에 체감했습니다. 최신 수치와 SVG 시각화(3회 측정 비교)는
+  [`loadtest/report.html`](loadtest/report.html)에 있습니다.
 
 ---
 
@@ -338,9 +369,9 @@ GPS/IMU 텔레메트리는 서버에서 가장 트래픽이 큰 경로인데, �
   낙상은 반대로 "전역 모델"만 있고 환자별 파인튜닝이 없습니다. 이 갭은 AI 담당자의 모델
   학습 작업이 선행돼야 해서, 백엔드만으로는 해결할 수 없는 부분까지 조사해 이슈에 기록해
   두었고 착수는 AI 담당자 협의 이후로 보류 중입니다.
-- **[Issue #4](https://github.com/Baguette-boost/backend-server/issues/4)** — DB 풀/워커
-  확장, 텔레메트리 경로 경량화(자세한 원인은 [트러블슈팅 3](#3-부하테스트로-드러난-db-커넥션-풀-고갈)
-  참고). 다른 작업 완료 후 착수 예정.
+- **[Issue #4](https://github.com/Baguette-boost/backend-server/issues/4)** — DB 풀 상향
+  시도(원복)와 uvicorn 멀티워커+Redis 전환은 완료([트러블슈팅 3](#3-부하테스트로-드러난-db-커넥션-풀-고갈)
+  참고). 남은 항목: 배회 detect를 GPS 핑 경로에서 분리, 보호자 앱 폴링을 WebSocket 푸시로 전환.
 - 공통 예외 응답 포맷이 아직 라우터별 `HTTPException` 직접 반환 방식이라 통일돼 있지 않습니다.
 - 마이그레이션 시스템이 없어(`CREATE TABLE IF NOT EXISTS` 기반) 스키마 변경 시 이미 떠 있는
   운영 DB에는 수동 반영이 필요합니다.

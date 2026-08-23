@@ -96,53 +96,55 @@
 </style>
 
 <div class="wrap">
-  <p class="eyebrow">Baguetteboost · 백엔드 부하테스트 · 2026-08-22 재측정</p>
+  <p class="eyebrow">Baguetteboost · 백엔드 부하테스트 · 2026-08-23 재측정 (Issue #4 2단계)</p>
   <h1>서버는 몇 명까지 버티는가 — 400명 램프 리포트</h1>
-  <p class="sub">치매 환자 모니터링 백엔드(FastAPI)에 환자 기기 + 보호자 앱 혼합 부하를 걸어 처리량 한계와 병목을 측정했다. 최초 측정(2026-07-18) 이후 <code>device_token</code> 실제 DB 검증이 추가되며 용량이 눈에 띄게 낮아져 재측정했다.</p>
+  <p class="sub">치매 환자 모니터링 백엔드(FastAPI)에 환자 기기 + 보호자 앱 혼합 부하를 걸어 처리량 한계와 병목을 측정했다. 08-22 재측정에서 드러난 <b>단일 uvicorn 워커 CPU 포화</b>를 <b>gunicorn 4워커 + Redis(GPS 버퍼·WebSocket 팬아웃 공유) 전환</b>으로 해소한 뒤 다시 측정한 결과다.</p>
   <div class="meta">
     <span>도구 Locust 2.46.3</span><span>부하 400 VUs · 램프 10/s · 5분</span>
-    <span>대상 uvicorn 1-worker</span><span>호스트 4 vCPU (co-located)</span>
-    <span>측정일 2026-08-22 (최초 2026-07-18)</span>
+    <span>대상 gunicorn 4-worker(UvicornWorker) + Redis</span><span>호스트 4 vCPU (co-located)</span>
+    <span>측정일 2026-08-23 (08-22 재측정 · 최초 2026-07-18)</span>
   </div>
 
   <div class="verdict">
-    <p class="lead" style="margin:0"><b>결론.</b> 처리량은 <b>~52 RPS</b> 부근에서 정점(동시 <b>~210~240명</b>)을 찍은 뒤, 400명까지는 물론 <b>400명을 5분간 유지하는 동안에도 안정화되지 않고 계속 하락</b>한다(정점 52 RPS → 5분 뒤 ~32~40 RPS). 원인은 이전과 동일한 <b>단일 uvicorn 워커(코어 1개 포화)</b> + <b>DB 커넥션 풀 고갈(30)</b>이지만, 이번엔 풀 고갈이 대기 지연을 넘어 <code>QueuePool ... connection timed out</code> <b>명시적 500 에러(29건)</b>로 실제 요청 실패를 냈다. AI 컨테이너는 여전히 병목이 아니다.</p>
+    <p class="lead" style="margin:0"><b>결론.</b> 단일 워커 CPU 포화를 4워커로 해소하자 처리량이 <b>램프 중 ~90 RPS</b>까지 오르고(뚜렷한 무릎점 없이 400명까지 계속 상승), 400명 유지 5분간 <b>QueuePool 타임아웃 500 에러가 완전히 사라졌다</b>(08-22엔 29건). 400명 p95는 <b>15s → 5.1s</b>로, p50은 6.0s → 2.0s로 개선됐다. 다만 <b>실패율은 0.27%→1.81%로 소폭 늘었는데</b>, 원인이 DB 풀 고갈이 아니라 같은 호스트에서 locust·backend가 CPU를 경쟁하며 생기는 것으로 보이는 <code>RemoteDisconnected</code>(연결 끊김) 계열이라 성격이 다르다. <b>SLA(p95&lt;200ms) 용량 자체는 ~90명으로 08-22와 비슷</b> — 이번 조치는 "과부하 시 완전히 무너지지 않는" 문제를 풀었을 뿐, 저부하 SLA 상한을 올리진 못했다.</p>
   </div>
 
   <div class="cards">
-    <div class="card"><div class="k">처리량 한계</div><div class="v acc">52<span style="font-size:14px"> RPS</span></div><div class="n">~210~240명 정점 (이전 77 RPS·160명)</div></div>
-    <div class="card"><div class="k">건강 용량</div><div class="v good">~90<span style="font-size:14px"> 명</span></div><div class="n">p95 &lt; 200ms 기준 (이전 ~150명)</div></div>
-    <div class="card"><div class="k">400명 p95</div><div class="v crit">15<span style="font-size:14px"> s</span></div><div class="n">p50 6.0s · p99 23s (이전 9.0s/3.6s/13s)</div></div>
-    <div class="card"><div class="k">실패율</div><div class="v warn">0.27<span style="font-size:14px"> %</span></div><div class="n">11,681건 중 32건 (이전 0.05%)</div></div>
+    <div class="card"><div class="k">처리량(평균)</div><div class="v acc">75<span style="font-size:14px"> RPS</span></div><div class="n">램프 피크 ~90 RPS (08-22 52 RPS)</div></div>
+    <div class="card"><div class="k">건강 용량</div><div class="v warn">~90<span style="font-size:14px"> 명</span></div><div class="n">p95 &lt; 200ms 기준 (08-22와 동일 수준)</div></div>
+    <div class="card"><div class="k">400명 p95</div><div class="v good">5.1<span style="font-size:14px"> s</span></div><div class="n">p50 2.0s · p99 8.1s (08-22 15s/6.0s/23s)</div></div>
+    <div class="card"><div class="k">실패율</div><div class="v warn">1.81<span style="font-size:14px"> %</span></div><div class="n">22,561건 중 409건, 전부 연결끊김(08-22 0.27%·QueuePool 500)</div></div>
   </div>
 
-  <h2><span class="n">00</span>이전 측정(07-18) 대비 무엇이 달라졌나</h2>
-  <p class="sub">코드 변경 중 이 결과에 실질적 영향을 준 건 하나뿐이다 — 나머지(낙상 모델 교체, JWT 프로덕션 경로, 리포 위생 정리)는 이 테스트가 때리는 요청 경로와 무관하다.</p>
+  <h2><span class="n">00</span>세 차례 측정 비교 — 07-18 → 08-22 → 08-23</h2>
+  <p class="sub">08-22 재측정 후 두 가지를 시도했다: ① DB 커넥션 풀만 상향(10+20→70+30) — <b>오히려 악화되어 원복</b>(진짜 병목이 CPU였음을 확인). ② 그 원인 그대로 4워커+Redis로 전환 — 아래 표의 "08-23" 열.</p>
   <div class="tbl-wrap" style="margin-top:14px">
     <table>
-      <thead><tr><th>지표</th><th>이전 (07-18)</th><th>지금 (08-22)</th></tr></thead>
+      <thead><tr><th>지표</th><th>07-18 (최초)</th><th>08-22 (device_token 검증 후)</th><th>08-23 (4워커+Redis)</th></tr></thead>
       <tbody>
-        <tr><td>처리량 정점</td><td class="num">77 RPS</td><td class="num">52 RPS</td></tr>
-        <tr><td>SLA p95&lt;200ms 용량</td><td class="num">~150명</td><td class="num">~90명</td></tr>
-        <tr><td>400명 p50 / p95 / p99</td><td class="num">3.6s / 9.0s / 13s</td><td class="num">6.0s / 15s / 23s</td></tr>
-        <tr><td>실패율</td><td class="num">0.05%</td><td class="num">0.27%</td></tr>
-        <tr><td>정점 이후 거동</td><td>평평하게 안정(포화 상태 유지)</td><td><span class="pill crit">비안정</span> — 400명 유지 중에도 계속 악화</td></tr>
+        <tr><td>처리량</td><td class="num">77 RPS(정점)</td><td class="num">52 RPS(정점)</td><td class="num">75 RPS(평균)·90(램프피크)</td></tr>
+        <tr><td>SLA p95&lt;200ms 용량</td><td class="num">~150명</td><td class="num">~90명</td><td class="num">~90명</td></tr>
+        <tr><td>400명 p50 / p95 / p99</td><td class="num">3.6s / 9.0s / 13s</td><td class="num">6.0s / 15s / 23s</td><td class="num">2.0s / 5.1s / 8.1s</td></tr>
+        <tr><td>실패율</td><td class="num">0.05%</td><td class="num">0.27%</td><td class="num">1.81%</td></tr>
+        <tr><td>주 실패 유형</td><td>-</td><td>QueuePool 타임아웃(500)</td><td>RemoteDisconnected(연결끊김)</td></tr>
+        <tr><td>정점 이후 거동</td><td>평평하게 안정</td><td><span class="pill crit">비안정</span> — 계속 악화</td><td><span class="pill good">안정</span> — 400명 유지 중 하락 없음</td></tr>
       </tbody>
     </table>
   </div>
-  <p class="sub" style="margin-top:14px"><b>원인</b>: Issue #2에서 <code>verify_device_token()</code>이 DB 조회 없는 스텁 → 실제 <code>tracked_persons</code> 조회로 바뀌었다. GPS/IMU 요청(가장 트래픽이 많은 경로) <b>모두</b>에 DB 쿼리가 하나씩 추가된 셈이라, 이미 병목이었던 DB 풀(30)에 부담이 더 걸렸다. 단일 워커·풀 크기 등 구조 자체는 그대로라 "무엇이 병목인가"라는 정성적 결론은 그대로지만, 절대 수치는 이 결과가 더 신뢰할 수 있는 최신값이다.</p>
+  <p class="sub" style="margin-top:14px"><b>DB 풀만 올려본 실험(반영 안 됨)</b>: <code>pool_size 10→70, max_overflow 20→30</code>로 재측정했더니 처리량이 오히려 <b>29 RPS</b>로 더 떨어지고 QueuePool 타임아웃도 재발했다. 모니터링 결과 DB CPU는 그때도 여유(12~17%)였고 backend CPU만 그대로 1코어 포화 — 즉 <b>병목은 처음부터 DB가 아니라 CPU</b>였고, 풀을 키운 건 이미 포화인 CPU 앞에 더 많은 요청을 줄 세운 것뿐이었다(원래 작은 풀이 오히려 초과 요청을 빨리 실패시키는 백프레셔 역할을 하고 있었음). 그래서 풀 크기는 원복하고 워커 확장을 먼저 진행했다.</p>
+  <p class="sub" style="margin-top:10px"><b>4워커+Redis 전환 시 함께 처리한 것</b>: 인메모리 GPS 버퍼(<code>core/buffer.py</code>) → Redis 리스트, 스케줄러(하트비트·낙상판정·배회enroll) → 별도 프로세스(<code>baguetteboost-scheduler</code>)로 분리(워커마다 중복 실행되던 것 제거), WebSocket 알림 → Redis Pub/Sub 팬아웃(어느 워커가 소켓을 들고 있든 전달되도록). 세 가지 모두 멀티워커에서 프로세스 로컬 메모리에 있으면 깨지는 상태였다.</p>
 
-  <h2><span class="n">01</span>용량 곡선</h2>
-  <p class="sub">사용자 수를 10→400으로 올리며 측정한 순간 처리량(RPS)과 p95 지연(램프 도달 직후 값). 처리량이 평평해지는 순간부터 지연이 하키스틱처럼 튄다 — 이번엔 그 뒤로도 계속 나빠진다(아래 캡션 참고).</p>
+  <h2><span class="n">01</span>용량 곡선 — 08-22(단일워커) vs 08-23(4워커+Redis)</h2>
+  <p class="sub">사용자 수를 10→400으로 올리며 측정한 순간 처리량(RPS)과 p95 지연(램프 도달 직후 값). 굵은 실선이 이번(08-23) 결과, 흐린 점선이 08-22(개선 전) 참고선이다.</p>
   <div class="legend" style="margin-top:14px">
-    <span><i style="border-color:var(--accent)"></i>처리량 RPS (우축)</span>
-    <span><i style="border-color:var(--crit)"></i>p95 지연 (좌축, ms)</span>
-    <span><i style="border-color:var(--ink-3);border-top-style:dashed"></i>SLA 임계선</span>
+    <span><i style="border-color:var(--accent)"></i>처리량 RPS, 08-23 (우축)</span>
+    <span><i style="border-color:var(--crit)"></i>p95 지연, 08-23 (좌축, ms)</span>
+    <span><i style="border-color:var(--ink-3);border-top-style:dashed"></i>08-22 참고선 / SLA 임계선</span>
   </div>
   <figure>
     <div class="chart">
-      <svg viewBox="0 0 800 380" role="img" aria-label="사용자 수 대비 RPS와 p95 지연 곡선">
-        <!-- grid (latency scale: 0,2000,4000,6000ms) -->
+      <svg viewBox="0 0 800 380" role="img" aria-label="사용자 수 대비 RPS와 p95 지연 곡선, 08-22와 08-23 비교">
+        <!-- grid: 좌축 0/2k/4k/6k ms, 우축 0/30/60/90 RPS 가 같은 4개 그리드선을 공유 -->
         <g stroke="var(--line)" stroke-width="1">
           <line x1="56" y1="344" x2="776" y2="344"/>
           <line x1="56" y1="237.3" x2="776" y2="237.3"/>
@@ -154,9 +156,10 @@
           <text x="50" y="347">0</text><text x="50" y="241">2k</text>
           <text x="50" y="134">4k</text><text x="50" y="28">6k</text>
         </g>
-        <!-- right axis labels (RPS) -->
+        <!-- right axis labels (RPS, 0-90 scale) -->
         <g fill="var(--accent)" font-family="var(--mono)" font-size="11" text-anchor="start">
-          <text x="782" y="347">0</text><text x="782" y="188">30</text><text x="782" y="28">60</text>
+          <text x="782" y="347">0</text><text x="782" y="241">30</text>
+          <text x="782" y="134">60</text><text x="782" y="28">90</text>
         </g>
         <!-- x axis ticks -->
         <g fill="var(--ink-3)" font-family="var(--mono)" font-size="11" text-anchor="middle">
@@ -170,71 +173,76 @@
         <line x1="56" y1="290.7" x2="776" y2="290.7" stroke="var(--warn)" stroke-width="1" stroke-dasharray="5 4" opacity=".8"/>
         <text x="60" y="286" fill="var(--warn)" font-family="var(--mono)" font-size="10">p95 1s</text>
 
-        <!-- p95 latency area + line -->
-        <polygon opacity=".10" fill="var(--crit)"
-          points="110,344 110,334.4 164,333.9 218,333.3 272,324.8 326,311.5 380,290.7 434,264 488,242.7 542,205.3 596,184 650,146.7 704,104 758,72 776,34.7 776,344"/>
-        <polyline fill="none" stroke="var(--crit)" stroke-width="2.5" stroke-linejoin="round"
+        <!-- 08-22 참고선 (흐리게, 점선) -->
+        <polyline fill="none" stroke="var(--crit)" stroke-width="1.5" stroke-dasharray="4 4" opacity=".35" stroke-linejoin="round"
           points="110,334.4 164,333.9 218,333.3 272,324.8 326,311.5 380,290.7 434,264 488,242.7 542,205.3 596,184 650,146.7 704,104 758,72 776,34.7"/>
-        <!-- RPS line -->
-        <polyline fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"
-          points="110,237.3 164,214.7 218,186.3 272,164.8 326,114.1 380,84.3 434,67.7 488,67.2 542,80.0 596,75.2 650,88.5 704,87.5 758,93.9 776,89.1"/>
+        <polyline fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="4 4" opacity=".35" stroke-linejoin="round"
+          points="110,271.8 164,256.5 218,237.7 272,223.1 326,188.6 380,168.7 434,157.3 488,157.0 542,165.9 596,162.7 650,171.6 704,170.8 758,175.1 776,171.9"/>
 
-        <!-- knee marker at ~210-240 users (x=460) -->
-        <line x1="460" y1="24" x2="460" y2="344" stroke="var(--accent)" stroke-width="1" stroke-dasharray="2 3" opacity=".55"/>
-        <circle cx="460" cy="67.5" r="4" fill="var(--accent)"/>
-        <text x="466" y="46" fill="var(--accent)" font-family="var(--mono)" font-size="10.5">무릎점 ~210~240명 · ~52 RPS</text>
-        <!-- crossing markers -->
-        <circle cx="302" cy="317.3" r="3.5" fill="var(--crit)"/>
-        <text x="230" y="313" fill="var(--ink-2)" font-family="var(--mono)" font-size="10">~137명</text>
-        <circle cx="380" cy="290.7" r="3.5" fill="var(--warn)"/>
-        <text x="386" y="306" fill="var(--ink-2)" font-family="var(--mono)" font-size="10">~180명</text>
+        <!-- 08-23 p95 latency area + line -->
+        <polygon opacity=".10" fill="var(--crit)"
+          points="110,344 110,331.2 164,333.3 218,333.9 272,332.3 326,332.3 380,331.7 434,329.6 488,326.9 542,314.7 596,300.8 650,285.3 704,264 758,253.3 776,248 776,344"/>
+        <polyline fill="none" stroke="var(--crit)" stroke-width="2.5" stroke-linejoin="round"
+          points="110,331.2 164,333.3 218,333.9 272,332.3 326,332.3 380,331.7 434,329.6 488,326.9 542,314.7 596,300.8 650,285.3 704,264 758,253.3 776,248"/>
+        <!-- 08-23 RPS line -->
+        <polyline fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"
+          points="110,272.9 164,260.4 218,241.9 272,227.7 326,183.3 380,142.8 434,109.3 488,76.3 542,49.6 596,32.5 650,25.1 704,23.3 758,25.4 776,21.2"/>
+
+        <!-- peak marker at ~360 users (08-23) -->
+        <circle cx="704" cy="23.3" r="4" fill="var(--accent)"/>
+        <text x="560" y="16" fill="var(--accent)" font-family="var(--mono)" font-size="10.5">뚜렷한 무릎점 없이 ~360명·~90 RPS까지 상승</text>
+        <!-- crossing markers (08-23 p95 vs SLA lines) -->
+        <circle cx="530" cy="317.3" r="3.5" fill="var(--crit)"/>
+        <text x="470" y="313" fill="var(--ink-2)" font-family="var(--mono)" font-size="10">~264명</text>
+        <circle cx="631" cy="290.7" r="3.5" fill="var(--warn)"/>
+        <text x="637" y="306" fill="var(--ink-2)" font-family="var(--mono)" font-size="10">~320명</text>
       </svg>
     </div>
-    <figcaption>램프 초반(≤90명)은 p95 &lt; 200ms로 평탄. ~210~240명에서 RPS가 ~52로 <b>포화</b>하고, 이후 사용자는 전부 큐 대기로 쌓여 p95가 0.5s(~137명)→1s(~180명)→5.8s(400명 램프 도달 직후)로 튄다. <b>차이점</b>: 이번엔 400명을 5분간 유지하는 동안에도 멈추지 않고 계속 나빠져 구간 종료 시점엔 처리량 ~32~40 RPS·p95 15s대까지 추가로 악화됐다(이 궤적은 VU 축 특성상 차트에 그릴 수 없어 수치로만 기록).</figcaption>
+    <figcaption>08-22(점선)는 ~210명 부근에서 일찍 꺾여 ~52 RPS에 눌러앉았던 반면, 08-23(실선)은 같은 구간에서 지연이 계속 낮게 유지되며 ~360명까지 처리량이 늘어난다(무릎점이 사실상 사라짐). p95가 0.5s를 넘는 지점도 ~137명→~264명으로, 1s를 넘는 지점도 ~180명→~320명으로 밀렸다. 다만 400명 부근에서는 08-23도 결국 p95가 오르기 시작한다 — 4코어 자체의 처리 한계(backend CPU ~330/400%)에 근접하기 때문.</figcaption>
   </figure>
 
   <h2><span class="n">02</span>SLA별 용량 판정</h2>
   <div class="tbl-wrap">
     <table>
-      <thead><tr><th>SLA 목표 (p95)</th><th>수용 동시 사용자</th><th>상태</th></tr></thead>
+      <thead><tr><th>SLA 목표 (p95)</th><th>수용 동시 사용자</th><th>08-22 대비</th><th>상태</th></tr></thead>
       <tbody>
-        <tr><td>&lt; 200 ms</td><td class="num">~90</td><td><span class="pill good">권장 운영선</span></td></tr>
-        <tr><td>&lt; 500 ms</td><td class="num">~137</td><td><span class="pill warn">허용 한계</span></td></tr>
-        <tr><td>&lt; 1 s</td><td class="num">~180</td><td><span class="pill warn">체감 저하</span></td></tr>
-        <tr><td>그 이상</td><td class="num">210+</td><td><span class="pill crit">사용 불가 (비안정)</span></td></tr>
+        <tr><td>&lt; 200 ms</td><td class="num">~90</td><td class="num">~90 (동일)</td><td><span class="pill warn">권장 운영선 · 미개선</span></td></tr>
+        <tr><td>&lt; 500 ms</td><td class="num">~264</td><td class="num">~137 → ~264</td><td><span class="pill good">개선</span></td></tr>
+        <tr><td>&lt; 1 s</td><td class="num">~320</td><td class="num">~180 → ~320</td><td><span class="pill good">개선</span></td></tr>
+        <tr><td>그 이상</td><td class="num">330+</td><td>-</td><td><span class="pill warn">체감 저하(단, 비안정 붕괴는 아님)</span></td></tr>
       </tbody>
     </table>
   </div>
 
-  <h2><span class="n">03</span>병목 지목 — 리소스 증거</h2>
-  <p class="sub">부하 중 컨테이너별 CPU와 DB 커넥션을 15초 간격으로 샘플링했다. 백엔드와 DB만 한계에 닿았다.</p>
+  <h2><span class="n">03</span>병목 재확인 — 리소스 증거</h2>
+  <p class="sub">부하 중 컨테이너별 CPU와 DB 커넥션을 15초 간격으로 샘플링했다. CPU가 4코어에 고르게 분산되고, DB는 확실히 병목에서 벗어났다.</p>
   <div class="tbl-wrap" style="margin-top:14px">
     <table>
-      <thead><tr><th>자원</th><th>피크</th><th>판정</th></tr></thead>
+      <thead><tr><th>자원</th><th>08-22</th><th>08-23</th><th>판정</th></tr></thead>
       <tbody>
-        <tr class="crit"><td>backend CPU</td><td class="num">105%</td><td><span class="pill crit">1차 병목</span> 단일 워커가 코어 1개 포화 (호스트 4코어 중 3개 유휴) — 램프 시작 20초 만에 도달, 5분 내내 유지</td></tr>
-        <tr class="crit"><td>DB 커넥션</td><td class="num">31</td><td><span class="pill crit">2차 병목</span> 풀 <code>pool_size 10 + overflow 20 = 30</code> 완전 고갈, 5분 내내 지속</td></tr>
-        <tr class="crit"><td>DB 풀 타임아웃</td><td class="num">29건</td><td><span class="pill crit">신규 관측</span> <code>QueuePool limit ... connection timed out</code> → 명시적 <code>500</code> 에러로 이어짐 (이전 측정엔 없던 실패 유형)</td></tr>
-        <tr class="good"><td>ai-wander CPU</td><td class="num">5.6%</td><td><span class="pill good">여유</span> 배회 RF 추론 — 병목 아님</td></tr>
-        <tr class="good"><td>ai-fall CPU</td><td class="num">0.15%</td><td><span class="pill good">유휴</span> 낙상 TCN — 이벤트성이라 부하 낮음</td></tr>
+        <tr class="good"><td>backend CPU</td><td class="num">105%(1코어)</td><td class="num">~330%(4코어 중)</td><td><span class="pill good">해소</span> 4워커로 분산, 다만 400% 중 330%로 <b>여전히 이번 단계의 상한선</b>(코어 수가 다음 병목)</td></tr>
+        <tr class="good"><td>DB CPU</td><td class="num">여유</td><td class="num">~45~54%</td><td><span class="pill good">여유 유지</span> DB는 처음부터 병목이 아니었음(풀만 올렸던 실험에서 재확인)</td></tr>
+        <tr class="good"><td>DB 커넥션</td><td class="num">30/30 고갈</td><td class="num">~120~126 (자동 4배)</td><td><span class="pill good">해소</span> 워커마다 독립 풀(10+20)이라 4워커 전환만으로 여력이 자동으로 늘어남(변경 없이)</td></tr>
+        <tr class="good"><td>DB 풀 타임아웃</td><td class="num">29건</td><td class="num">0건</td><td><span class="pill good">재발 없음</span></td></tr>
+        <tr class="warn"><td>RemoteDisconnected</td><td class="num">0건</td><td class="num">409건(1.81%)</td><td><span class="pill warn">신규 관측</span> 서버 애플리케이션 로그엔 예외가 전혀 없어 원인이 명확치 않음 — locust·backend가 같은 4코어를 공유하는 테스트 환경 특성(co-located)일 가능성이 높음. 별도 호스트에서 재측정 필요</td></tr>
+        <tr class="good"><td>ai-wander / ai-fall CPU</td><td class="num">5.6% / 0.15%</td><td class="num">~7~14% / ~0.1%</td><td><span class="pill good">여유</span> 여전히 병목 아님</td></tr>
       </tbody>
     </table>
   </div>
 
-  <h2><span class="n">04</span>해결방안 — 효과·순서 순</h2>
+  <h2><span class="n">04</span>해결방안 — 진행 상황</h2>
   <ol class="fixes">
     <li>
-      <h3>uvicorn 워커 다중화 <span class="tag">효과 ★★★ · 3코어 유휴</span></h3>
-      <p>단일 프로세스 → <b>4워커</b>로 코어를 모두 활용하면 처리량 ~3–4배(≈230–300 RPS). 다만 현재 앱은 단일 프로세스 전제라 그냥 켜면 깨진다.</p>
-      <div class="warnbox">⚠️ 선행 필요: <b>스케줄러</b>가 워커마다 돌아 알림이 4중 발송되고, <b>인메모리 GPS 버퍼</b>가 워커별로 갈라진다. → 스케줄러를 별도 프로세스로 분리 + 버퍼를 Redis 공유(또는 배회 detect를 DB 조회 기반)로 먼저 전환한 뒤 <code>gunicorn -k uvicorn.workers.UvicornWorker -w 4</code>.</div>
+      <h3>DB 커넥션 풀 상향 <span class="tag">✅ 시도 · 반영 안 함(원복)</span></h3>
+      <p>가장 먼저 시도했으나(<code>pool_size 10→70, max_overflow 20→30</code>) 처리량이 29 RPS로 더 떨어지고 QueuePool 타임아웃도 재발했다. DB CPU는 그때도 여유였고 backend CPU만 그대로 포화 — <b>진짜 병목이 CPU였다는 걸 이 실험으로 확인</b>하고 원복, 순서를 ②로 바꿨다.</p>
     </li>
     <li>
-      <h3>DB 커넥션 풀 상향 <span class="tag">효과 ★★ · 즉효·저위험 · 우선순위↑</span></h3>
-      <p><code>database.py</code>의 <code>pool_size</code>/<code>max_overflow</code>를 올리고 MySQL <code>max_connections</code>(기본 151)와 함께 사이징. 4워커 기준 <b>워커당 풀 × 4 ≤ max_connections</b> (예: 워커당 15+15 → 총 120). 이번 재측정에서 풀 고갈이 지연을 넘어 <code>QueuePool timed out</code> <b>500 에러 29건</b>으로 실제 요청 실패를 냈으므로, 다른 항목보다 먼저 처리할 가치가 있다.</p>
+      <h3>uvicorn 워커 다중화 <span class="tag">✅ 완료 · 효과 ★★★</span></h3>
+      <p><code>gunicorn -k uvicorn.workers.UvicornWorker -w 4</code>로 전환, CPU가 1코어(105%) → 4코어 분산(~330%)으로 실제로 늘었다. 선행 과제였던 <b>스케줄러 중복 실행</b>(→ 별도 <code>baguetteboost-scheduler</code> 프로세스로 분리), <b>GPS 인메모리 버퍼</b>·<b>WebSocket 알림</b>(→ 둘 다 Redis로 공유: 버퍼는 리스트, 알림은 Pub/Sub 팬아웃)까지 함께 처리했다.</p>
     </li>
     <li>
-      <h3>배회 detect를 핑 경로에서 분리 <span class="tag">효과 ★★ · 쓰기경로 경량화</span></h3>
-      <p>지금은 <b>GPS 핑마다</b> 배회 AI를 백그라운드 호출 + DB 세션을 연다. 환자당 N핑/X초 <b>디바운스</b> 또는 스케줄러 주기 실행으로 옮기면 핑당 이벤트루프·DB 부하가 준다.</p>
+      <h3>배회 detect를 핑 경로에서 분리 <span class="tag">다음 순서 · 효과 ★★ · 쓰기경로 경량화</span></h3>
+      <p>지금도 <b>GPS 핑마다</b> 배회 AI를 백그라운드 호출한다(이제 Redis 버퍼 조회가 추가돼 핑당 비용이 인메모리 시절보다 약간 늘었다 — 이번 측정에서 SLA&lt;200ms 용량이 08-22와 그대로 ~90명인 이유 중 하나로 의심됨). 환자당 N핑/X초 <b>디바운스</b> 또는 스케줄러 주기 실행으로 옮기면 핑당 이벤트루프·Redis·DB 부하가 준다.</p>
     </li>
     <li>
       <h3>폴링 → WebSocket 푸시 <span class="tag">효과 ★★ · 읽기부하 감소</span></h3>
@@ -242,18 +250,19 @@
     </li>
     <li>
       <h3>수평 확장 <span class="tag">효과 ★★★ · 근본</span></h3>
-      <p>①~④로 앱이 프로세스-safe 해진 뒤 <b>백엔드 컨테이너 N개 + nginx/traefik 로드밸런서</b>, Redis로 버퍼·세션 공유 → 거의 선형 확장.</p>
+      <p>③~④ 이후 <b>백엔드 컨테이너 N개 + nginx/traefik 로드밸런서</b> — 버퍼·알림이 이미 Redis로 공유되므로 이번 단계 덕분에 수평 확장 자체의 걸림돌은 사라졌다.</p>
     </li>
   </ol>
 
   <div class="foot">
     <b>방법론 · 한계</b>
     <ul>
-      <li>혼합 부하: 환자 기기(device_token 인증 GPS 핑 + 가끔 IMU 낙상) + 보호자 앱(로그인 후 조회 폴링). 시드 보호자 50 · 환자 200. (07-18 최초 측정 당시는 device_token 검증이 스텁이라 사실상 무인증이었음 — 지금은 실제 DB 검증을 통과해야 한다.)</li>
-      <li>11,681건 중 실패 32건(0.27%): DB 풀 타임아웃(<code>500</code>) 29건 · 연결 끊김 8건 · 기타 <code>500</code> 3건 — 이번엔 <b>지연뿐 아니라 실제 에러</b>도 포함됐다.</li>
-      <li><b>공존 실행 주의:</b> locust·backend·db·AI가 같은 4코어 호스트에 함께 떠 CPU를 경쟁했다(07-18과 동일 조건). 따라서 절대 수치(52 RPS·90명)는 여전히 <b>보수적 하한</b>이며, "단일 워커+DB 풀이 병목"이라는 <b>상대적 결론은 확고</b>하다.</li>
-      <li><b>이 리포트가 "최신 상태"로 유효한 기간</b>: 다음에 telemetry 경로(GPS/IMU 수신)나 DB 풀 설정을 바꾸면 이 수치도 다시 stale해진다 — 그 시점에 재실행 권장.</li>
-      <li>재현: <code>loadtest/</code> — <code>seed_loadtest.py</code>, <code>locustfile.py</code>, <code>monitor.sh</code>. 원본 데이터는 <code>results/</code>(07-18, 접두어 없음)와 <code>results/20260822_*</code>(이번 재측정) 두 세트로 나란히 보관.</li>
+      <li>혼합 부하: 환자 기기(device_token 인증 GPS 핑 + 가끔 IMU 낙상) + 보호자 앱(로그인 후 조회 폴링). 시드 보호자 50 · 환자 200.</li>
+      <li>22,561건 중 실패 409건(1.81%): 전부 <code>RemoteDisconnected</code>(연결 끊김) — 08-22의 <code>QueuePool</code> 타임아웃 <code>500</code>은 이번엔 0건. 서버 애플리케이션 로그에 대응하는 예외가 없어, DB/애플리케이션 문제라기보단 co-located 테스트 환경(아래 항목)에서 오는 전송 계층 문제로 추정된다(확정은 아님 — 별도 호스트 재측정으로 확인 필요).</li>
+      <li><b>공존 실행 주의:</b> locust·backend·db·AI·redis·scheduler 가 같은 4코어 호스트에 함께 떠 CPU를 경쟁했다(07-18/08-22와 동일 조건). 따라서 절대 수치는 여전히 <b>보수적 하한</b>이며, "4워커 전환이 CPU 포화·QueuePool 타임아웃을 실제로 해소했다"는 <b>상대적 결론은 확고</b>하다.</li>
+      <li>Redis Pub/Sub을 통한 WebSocket 팬아웃은 수동 테스트(연결된 소켓에 <code>redis-cli PUBLISH</code>로 직접 발행)로 4워커 모두가 구독 중임을 확인했다 — locust 시나리오 자체는 WebSocket을 다루지 않는다.</li>
+      <li><b>이 리포트가 "최신 상태"로 유효한 기간</b>: 다음에 telemetry 경로나 워커 수·DB 풀 설정을 바꾸면 이 수치도 다시 stale해진다 — 그 시점에 재실행 권장.</li>
+      <li>재현: <code>loadtest/</code> — <code>seed_loadtest.py</code>, <code>locustfile.py</code>, <code>monitor.sh</code>. 원본 데이터는 <code>results/</code>(07-18, 접두어 없음) · <code>results/20260822_*</code>(08-22) · <code>results/multiworker_capacity_*</code>(08-23, 이번 재측정) 세 세트로 나란히 보관.</li>
     </ul>
   </div>
 </div>

@@ -243,7 +243,10 @@ DB에서 빈 문자열로 무효화합니다. **`expo_token`은 지워지지 않
 `backend/routers/telemetry.py`, 스키마: `backend/schemas/telemetry.py`. 인증: `Authorization: Device <device_token>`.
 
 ### `POST /telemetry/gps`
-ESP32가 10초 주기로 위경도 전송. 배회 판정으로만 이어짐(낙상과 무관).
+ESP32가 **20초** 주기로 위경도 전송(배회 RF 모델이 `wandering_detector/detect.py`의
+"one fix every ~20s" 전제로 학습·설계돼 있음 — `backend/core/scheduler.py`의
+`WANDER_RESAMPLE_SECONDS=20`, `backend/core/buffer.py`의 버퍼 크기 산정도 동일 전제).
+배회 판정으로만 이어짐(낙상과 무관).
 ```jsonc
 // 요청
 { "personId": 1, "gps": { "latitude": 37.50123, "longitude": 127.03645, "timestamp": "2026-08-22T00:41:00Z" } }

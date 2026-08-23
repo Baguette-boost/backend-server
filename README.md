@@ -33,7 +33,7 @@ ICCAS 2026 발표 프로젝트(팀명 Baguette Boost / 서비스명 Voost)이며
 
 ```
 ESP32 조끼
-  ├─ 10초 주기 GPS ──► POST /telemetry/gps ──► Redis 버퍼(15분) ──► AI-배회(RF) ──► 배회 시 알림
+  ├─ 20초 주기 GPS ──► POST /telemetry/gps ──► Redis 버퍼(15분) ──► AI-배회(RF) ──► 배회 시 알림
   └─ 가속도 임계치 초과 시
      직전10초+직후2초 IMU ──► POST /telemetry/fall-suspect ──► AI-낙상(TCN) ──► 낙상 시 알림
 

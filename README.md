@@ -219,6 +219,11 @@ curl http://localhost:8000/health
 
 ---
 
+## 테이블 설계
+<img width="1056" height="696" alt="Image" src="https://github.com/user-attachments/assets/455bbac8-a541-49a1-ab5f-9be4fec6c604" />
+
+---
+
 ## 핵심 트러블슈팅 3가지
 
 ### 1. device_token 사칭 차단

@@ -185,7 +185,8 @@ async def receive_gps(
     device_person_id: int = Depends(verify_device_token),
     db: AsyncSession = Depends(get_db)
 ):
-    """ [디바이스 -> 서버] 주기적으로 전송되는 GPS 데이터 수신 → 버퍼 적재 및 AI 배회 분석 위임 """
+    """ [디바이스 -> 서버] 주기적으로 전송되는 GPS 데이터 수신 → 버퍼 적재. 배회 판정은 1분 디바운스로
+    분리되어 scheduler.check_wandering()이 담당한다(Issue #6). """
     # 토큰의 주인과 요청 바디의 personId 가 다르면(사칭) 차단
     if device_person_id != request.personId:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Device token does not match personId.")
@@ -214,26 +215,15 @@ async def receive_gps(
     await db.execute(update_stmt)
     await db.commit()
 
-    # 수신 데이터 버퍼 적재 및 AI(배회) 분석 위임
-
     # Redis 버퍼에 즉시 적재 (가장 오래된 데이터는 자동 트림 — 멀티워커에서도 공유됨)
     await add_gps_to_buffer(request.personId, gps_dict)
 
-    # 2. DB Insert는 백그라운드로 넘겨 API 응답 속도 최적화
+    # DB Insert는 백그라운드로 넘겨 API 응답 속도 최적화
     background_tasks.add_task(async_insert_gps_log, request.personId, gps_dict)
 
-    # AI 분석용 payload 구성 (datetime 객체를 그대로 전달)
-    gps_list = await get_patient_gps_history(request.personId)
-
-    payload = AIPredictRequest(
-        personId=request.personId,
-        timestamp=request.gps.timestamp,
-        imuData=None,
-        gpsData=gps_list
-    )
-    
-    # AI & 알림 로직을 백그라운드로 위임 -> API 응답 속도 최적화
-    background_tasks.add_task(NotificationService.broadcast_event, db=None, guardian_id=None, event_type=None, person_id=request.personId, payload_data=None, payload=payload)
+    # 배회(AI) 판정은 여기서 매 핑마다 하지 않는다 — scheduler.check_wandering()이 1분 주기로
+    # 배치 판정한다(Issue #6: /detect는 매 호출마다 버퍼 전체를 재평가하는 순수 함수라
+    # 호출을 debounce해도 놓치는 이벤트 없이 backend 부하만 줄어듦).
     
     return {"status": "success", "message": "Data received and AI analysis started"}
 

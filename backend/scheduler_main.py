@@ -11,6 +11,8 @@ import logging
 import time
 
 from backend.core.scheduler import start_scheduler, stop_scheduler
+from backend.services.ai_client import ai_client
+from backend.core import redis_client
 
 logging.basicConfig(
     level=logging.INFO,
@@ -22,12 +24,18 @@ logger = logging.getLogger("scheduler_main")
 
 async def main() -> None:
     logger.info("독립 스케줄러 프로세스를 시작합니다.")
+    # check_wandering(Issue #6)이 공용 ai_client(배회 /detect)와 GPS 버퍼(Redis)를 쓰므로
+    # 이 프로세스에서도 초기화해야 한다 — 안 하면 client가 None이라 조용히 실패/에러난다.
+    redis_client.start()
+    ai_client.start()
     start_scheduler()
     try:
         while True:
             await asyncio.sleep(3600)
     finally:
         stop_scheduler()
+        await ai_client.stop()
+        await redis_client.stop()
 
 
 if __name__ == "__main__":

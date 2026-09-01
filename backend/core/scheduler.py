@@ -14,6 +14,8 @@ from backend.services.notification_service import NotificationService
 from backend.utils.time import utcnow
 from backend.utils.geo import clean_track, radius_of_gyration_m
 from backend.config import settings
+from backend.core.buffer import get_patient_gps_history
+from backend.schemas.ai import AIPredictRequest
 import asyncio
 
 # logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -40,8 +42,10 @@ WANDER_ENROLL_MIN_DAYS = 7      # 게이트: 유효 데이터가 있는 최소 �
 WANDER_ENROLL_MIN_FIXES = 1000  # 게이트: 20초 리샘플 후 최소 fix 수
 WANDER_RESAMPLE_SECONDS = 20    # RF 전제(20초 간격)에 맞춰 리샘플
 
-# 배회 감지는 GPS 수신 경로(receive_gps → broadcast_event)에서 매 핑마다 처리하므로
-# 별도 스케줄러 잡(check_wandering_job)은 제거되었다.
+# 배회 판정 디바운스 주기(Issue #6): /detect가 매 호출마다 버퍼(최근 15분) 전체를
+# 처음부터 재평가하는 순수 함수라, GPS 핑(20초)마다 대신 이 주기로 호출을 줄여도
+# 놓치는 이벤트 없이 backend CPU 부하만 줄어든다.
+WANDER_CHECK_INTERVAL_MINUTES = 1
 
 async def monitor_device_heartbeats():
     """
@@ -270,6 +274,33 @@ async def enroll_wandering_models():
         await db.commit()
 
 
+async def check_wandering():
+    """[1분 주기] 활성 + RF 등록 완료 환자를 배치로 배회 판정한다(Issue #6).
+
+    RF 모델이 미등록(wandering_enrolled=False)이면 /detect가 항상 404(비트리거)라
+    호출 자체를 스킵한다. GPS 버퍼 조회·AI 호출·알림은 기존 receive_gps 경로가
+    쓰던 것과 동일한 NotificationService.broadcast_event()를 그대로 재사용한다
+    (판정/알림 로직 중복 구현 방지).
+    """
+    async with get_independent_session() as db:
+        person_ids = (await db.execute(
+            select(TrackedPerson.id).where(
+                TrackedPerson.is_active == True,
+                TrackedPerson.wandering_enrolled == True,
+            )
+        )).scalars().all()
+
+    for person_id in person_ids:
+        gps_list = await get_patient_gps_history(person_id)
+        if not gps_list:
+            continue
+        payload = AIPredictRequest(personId=person_id, imuData=None, gpsData=gps_list)
+        await NotificationService.broadcast_event(
+            db=None, guardian_id=None, event_type=None,
+            person_id=person_id, payload_data=None, payload=payload,
+        )
+
+
 def start_scheduler():
     logger.info("## [스케줄러] start_scheduler() 함수가 호출되었습니다! ##")
 
@@ -277,6 +308,8 @@ def start_scheduler():
     scheduler.add_job(monitor_device_heartbeats, 'interval', minutes=1)
     # 1분 주기로 낙상 부동 판정 루프 가동
     scheduler.add_job(monitor_fall_episodes, 'interval', minutes=1)
+    # 1분 주기로 배회 배치 판정 (Issue #6 — GPS 핑 경로에서 분리)
+    scheduler.add_job(check_wandering, 'interval', minutes=WANDER_CHECK_INTERVAL_MINUTES)
     # 하루 1회(새벽 3시) 미등록 환자 배회 RF 모델 enroll
     scheduler.add_job(enroll_wandering_models, 'cron', hour=3)
     scheduler.start()
